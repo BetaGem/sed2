@@ -1,0 +1,15 @@
+astropy
+astroquery
+bagpipes
+corner
+dust_extinction
+h5py
+json
+nautilus
+numpy
+matplotlib
+multiprocess
+pandas
+photutils
+reproject
+scipy

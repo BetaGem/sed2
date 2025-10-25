@@ -1,0 +1,562 @@
+{
+    "IC1613": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 151,
+        "mask":[
+            3,
+            3,
+            3
+        ]
+    },
+    "IC1727": {
+        "filter": "GALEX_NUV",
+        "nsigma": 3,
+        "size": 201,
+        "mask":[
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC0628": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.0,
+        "size": 151,
+        "mask":[
+            1,
+            3,
+            1
+        ]
+    },
+    "NGC0660": {
+        "filter": "SDSS_g",
+        "nsigma": 1,
+        "size": 301,
+        "mask":[
+            2,
+            5,
+            5
+        ]
+    },
+    "NGC0672": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask":[
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC0864": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 401,
+        "mask":[
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC0891": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask":[
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC0925": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask":[
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC1055": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 301,
+        "mask":[
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC2541": {
+        "filter": "GALEX_NUV",
+        "nsigma": 2.0,
+        "size": 401,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC2841": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 151,
+        "mask": [
+            3,
+            2,
+            6
+        ]
+    },
+    "NGC2903": {
+        "filter": "SDSS_g",
+        "nsigma": 1.5,
+        "size": 201,
+        "mask": [
+            2,
+            5,
+            5
+        ]
+    },
+    "NGC3169": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 301,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC3198": {
+        "filter": "GALEX_FUV",
+        "nsigma": 2.0,
+        "size": 121,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC3338": {
+        "filter": "SDSS_g",
+        "nsigma": 1,
+        "size": 101,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC3344": {
+        "filter": "GALEX_NUV",
+        "nsigma": 2,
+        "size": 201,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC3368": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 201,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC3432": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 151,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC3486": {
+        "filter": "GALEX_NUV",
+        "nsigma": 2,
+        "size": 151,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC3521": {
+        "filter": "SDSS_i",
+        "nsigma": 1,
+        "size": 121,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC3556": {
+        "filter": "SDSS_r",
+        "nsigma": 1,
+        "size": 301,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC3628": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 121,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC3718": {
+        "filter": "SDSS_r",
+        "nsigma": 0.5,
+        "size": 101,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC4214": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 121,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4244": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 121,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4254": {
+        "filter": "GALEX_FUV",
+        "nsigma": 3,
+        "size": 91,
+        "mask": [
+            3,
+            2,
+            3
+        ]
+    },
+    "NGC4258": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 129,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4303": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 301,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4395": {
+        "filter": "GALEX_FUV",
+        "nsigma": 0.5,
+        "size": 337,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4414": {
+        "filter": "SDSS_r",
+        "nsigma": 0.8,
+        "size": 301,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4437": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4449": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1,
+        "size": 121,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "NGC4490": {
+        "filter": "GALEX_FUV",
+        "nsigma": 2,
+        "size": 151,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4496A": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 81,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4527": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "NGC4532": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4536": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4559": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 121,
+        "mask": [
+            3,
+            1,
+            3
+        ]
+    },
+    "NGC4565": {
+        "filter": "SDSS_g",
+        "nsigma": 1,
+        "size": 121,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "NGC4618": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 91,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4625": {
+        "filter": "GALEX_NUV",
+        "nsigma": 2,
+        "size": 91,
+        "mask": [
+            2,
+            3,
+            3
+        ]
+    },
+    "NGC4631": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1,
+        "size": 201,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4656": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 201,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC4725": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 121,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "NGC4826": {
+        "filter": "SDSS_r",
+        "nsigma": 3,
+        "size": 101,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "NGC5033": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC5055": {
+        "filter": "SDSS_g",
+        "nsigma": 1,
+        "size": 151,
+        "mask": [
+            2.5,
+            5,
+            5
+        ]
+    },
+    "NGC5194": {
+        "filter": "SDSS_r",
+        "nsigma": 1.0,
+        "size": 151,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "NGC5248": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1,
+        "size": 101,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC5457": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 211,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC5474": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 81,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC5775": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 301,
+        "mask": [
+            3,
+            5,
+            3
+        ]
+    },
+    "NGC5907": {
+        "filter": "GALEX_FUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC6384": {
+        "filter": "GALEX_NUV",
+        "nsigma": 1.5,
+        "size": 101,
+        "mask": [
+            3,
+            3,
+            3
+        ]
+    },
+    "NGC7331": {
+        "filter": "SDSS_r",
+        "nsigma": 1,
+        "size": 101,
+        "mask": [
+            3,
+            5,
+            5
+        ]
+    },
+    "SexB": {
+        "filter": "SDSS_r",
+        "nsigma": 1.5,
+        "size": 151,
+        "mask": [
+            2,
+            10,
+            10
+        ]
+    }
+}

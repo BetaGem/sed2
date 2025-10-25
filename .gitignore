@@ -1,0 +1,42 @@
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual envs
+.env
+.venv/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints
+
+# Large data files - keep these out of the repo
+*.fits
+*.fits.gz
+*.fit
+*.fts
+*.fz
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.tar.gz
+*.tgz
+
+# Common data folders
+data/
+raw_data/
+downloads/
+
+# caches / test outputs
+.pytest_cache/
+.coverage

@@ -82,7 +82,7 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     dust["n_prior_mu"] = 0.7
     dust["n_prior_sigma"] = 0.3
     dust["eta_prior"] = "Gaussian"
-    dust["eta_prior_mu"] = 1.0
+    dust["eta_prior_mu"] = 2.0
     dust["eta_prior_sigma"] = 0.3 
     fit_instructions["dust"] = dust
     

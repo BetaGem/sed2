@@ -57,7 +57,7 @@ def load_filters(filter_names):
 
 
 def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
-             use_halpha=False, nebular_metallicity=None):
+             use_halpha=False, nebular_metallicity=None, dust_ratio=None):
     """
     Create the fit instruction dictionary.
     """
@@ -80,11 +80,13 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     dust["n_prior"] = "Gaussian"
     dust["n_prior_mu"] = 0.7
     dust["n_prior_sigma"] = 0.3
-    # eta parameter based on Wild et al. (2011)
     dust["eta"] = (1., 4.)
     dust["eta_prior"] = "Gaussian"
-    dust["eta_prior_mu"] = 2.5
-    dust["eta_prior_sigma"] = 0.5 
+    if dust_ratio is not None:
+        dust["eta_prior_mu"] = dust_ratio
+    else:
+        dust["eta_prior_mu"] = 1 / 0.44
+    dust["eta_prior_sigma"] = 0.3
     fit_instructions["dust"] = dust
     
     if nebular_emission:
@@ -114,7 +116,7 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
 
 
 def build_all(ID, flux_table, filter_list=None, 
-              redshift=0.0022, nebular_metal=None):
+              redshift=0.0022, manual_prior=None):
     """ 
     Build the galaxy and fit instruction objects for Bagpipes.
     Please modify this function for specphotometry fitting.
@@ -129,9 +131,9 @@ def build_all(ID, flux_table, filter_list=None,
         The list of filters to use.
     redshift : float
         The redshift of the galaxy.
-    nebular_metal_table : str
-        The path to the nebular metallicity table.
-        If None, fixed to stellar metallicity.
+    manual_prior : str
+        The path to the manual prior file
+
     Returns
     -------
     galaxy : pipes.galaxy
@@ -142,6 +144,7 @@ def build_all(ID, flux_table, filter_list=None,
     # define some global variables
     global catalog, catalog_err, filters, fini, z
 
+    # load basic info
     z = redshift
     catalog = Table.read(flux_table)
     catalog_err = Table.read(flux_table.replace(".fits", "_err.fits"))
@@ -154,27 +157,35 @@ def build_all(ID, flux_table, filter_list=None,
     # check if Halpha is in the filter list
     halpha = True if 'ha' in file_name(filters) else False
 
-    # load metallicity info
-    if nebular_metal is not None:
-        zgas = np.load(nebular_metal)[ID]
-    else: zgas = None
+    # load priors calibrated from spectroscopic data
+    ## you can modify this part to load your own priors
+    ## by default, the priors are produces in SparseFit.binning.pix_priors
+    if manual_prior is not None:
+
+        prior_npz = np.load(manual_prior)
+        if 'zgas' in prior_npz:
+            zgas = prior_npz['zgas'][ID]
+        else: zgas = None
+
+        if 'eta' in prior_npz:
+            dust_ratio = prior_npz['eta']
+        else: dust_ratio = None
 
     # initialize fini
     fini = np.full_like(filters, True)
     _ = load_phot(ID)  
 
+    # standard Bagpipes objects
     filter_paths = load_filters(filters)
-    galaxy = pipes.galaxy(ID, load_phot, 
-                          filt_list=filter_paths, 
-                          spectrum_exists=False, 
-                          phot_units='ergscma')
+    galaxy = pipes.galaxy(ID, load_phot, filt_list=filter_paths, 
+                          spectrum_exists=False, phot_units='ergscma')
     fit_inst = fit_info(use_halpha=halpha, 
-                        nebular_metallicity=zgas)
+                        nebular_metallicity=zgas, dust_ratio=dust_ratio)
 
     return galaxy, fit_inst
 
 
-def run(ID, flux_table, nebular_metal=None, 
+def run(ID, flux_table, manual_prior=None, 
         filter_list=None, redshift=0.0022, 
         run='.', nlive=1000, pool=1, verbose=True):
     '''
@@ -182,7 +193,7 @@ def run(ID, flux_table, nebular_metal=None,
     '''
 
     galaxy, fit_inst = build_all(ID, flux_table, filter_list, 
-                                 redshift, nebular_metal)
+                                 redshift, manual_prior)
 
     fit = pipes.fit(galaxy, fit_inst, run=run)
     fit.fit(sampler="nautilus", 

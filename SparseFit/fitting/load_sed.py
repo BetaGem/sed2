@@ -13,9 +13,9 @@ class BSEDresults(object):
     """
     Class to handle SED fitting results from Bagpipes.
     """
-    def __init__(self, name, ID, flux_table, 
+    def __init__(self, name, ID, flux_table, manual_prior=None,
                  filter_list=None, redshift=0.0022, run='',
-                 advanced=True, distance=0, path=''):
+                 advanced=True, distance=0, posterior_path=''):
         """
         Initialize the SEDresults object with the result files.
         """
@@ -26,9 +26,10 @@ class BSEDresults(object):
         self.run = name + run
 
         self.galaxy, self.fit_info = script.build_all(ID, flux_table,
-                                                      filter_list, redshift)
+                                                      filter_list, redshift,
+                                                      manual_prior=manual_prior)
         self.fit = pipes.fit(self.galaxy, self.fit_info, run=self.run, 
-                             path=path)  # TODO: Remove the path when publishing 
+                             path=posterior_path)  # TODO: Remove the path when publishing 
         if advanced:
             # WARNING: this is memory intensive
             # The program may crash when loading too many objects in this mode

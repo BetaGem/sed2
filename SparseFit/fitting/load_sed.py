@@ -15,7 +15,7 @@ class BSEDresults(object):
     """
     def __init__(self, name, ID, flux_table, manual_prior=None,
                  filter_list=None, redshift=0.0022, run='',
-                 advanced=True, distance=0, posterior_path=''):
+                 advanced=True, distance=0, path_posterior=''):
         """
         Initialize the SEDresults object with the result files.
         """
@@ -29,7 +29,7 @@ class BSEDresults(object):
                                                       filter_list, redshift,
                                                       manual_prior=manual_prior)
         self.fit = pipes.fit(self.galaxy, self.fit_info, run=self.run, 
-                             path=posterior_path)  # TODO: Remove the path when publishing 
+                             path=path_posterior)  # TODO: Remove the path when publishing 
         if advanced:
             # WARNING: this is memory intensive
             # The program may crash when loading too many objects in this mode

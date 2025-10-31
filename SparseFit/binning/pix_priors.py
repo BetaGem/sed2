@@ -79,7 +79,8 @@ def estimate_eta(logMstar, out_path='manual_priors.npz'):
     Estimate the eta parameter based on Lin & Kong (2020)
     '''
     import os
-    eta = 3.460 - 0.277 * logMstar
+    eta = 1 / (3.460 - 0.277 * logMstar)
+    eta = np.clip(eta, 1.0, 10.0)
     
     if not os.path.exists(out_path):
         np.savez(out_path, eta=eta)

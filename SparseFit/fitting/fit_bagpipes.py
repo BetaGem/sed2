@@ -83,7 +83,7 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     dust["eta"] = (1., 4.)
     dust["eta_prior"] = "Gaussian"
     if dust_ratio is not None:
-        dust["eta_prior_mu"] = dust_ratio
+        dust["eta_prior_mu"] = float(dust_ratio)
     else:
         dust["eta_prior_mu"] = 1 / 0.44
     dust["eta_prior_sigma"] = 0.3

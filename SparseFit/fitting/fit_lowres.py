@@ -12,8 +12,8 @@ __all__ = ["predict_flux_table", "convolve_flux_map",
            "predict_flux_map", "new_flux_table"]
 
 
-def predict_flux_table(highres_flux_path, filters, 
-                       seds=None, run='_highres', galaxy=None, path_posterior='',
+def predict_flux_table(highres_flux_path, filters, seds=None,
+                       run='_highres', galaxy=None, path_posterior='', manual_prior=None,
                        out_path=None, prefix='pred_', overwrite=True):
     '''
     Create flux table involving all filters. 
@@ -32,6 +32,8 @@ def predict_flux_table(highres_flux_path, filters,
         Name of the galaxy.
     path_posterior : str, optional
         Path to the posterior files.
+    manual_prior : str, optional
+        Path to the manual prior file.
     out_path : str, optional
         Output path for the predicted flux table.
     prefix : str, optional
@@ -58,8 +60,9 @@ def predict_flux_table(highres_flux_path, filters,
         if seds is not None:
             sed = seds[j]
         else:
-            sed = BSEDresults(galaxy, ID=j, run=run, flux_table=highres_flux_path,
-                              path=path_posterior)
+            sed = BSEDresults(galaxy, ID=j, run=run, 
+                              flux_table=highres_flux_path, manual_prior=manual_prior,
+                              path_posterior=path_posterior)
 
         for i, f in enumerate(filters):
             if f in highres_filters:

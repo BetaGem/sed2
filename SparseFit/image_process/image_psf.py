@@ -59,7 +59,7 @@ def load_kernel(band1, band2, pix_scale=None, eps=1e-3, gaussian_w4=True):
 
 
 def match_image(img_path, sci_img, var_img, filters,
-                ref_band='wise_w4', ref_band_pixscale=None,
+                ref_band='wise_w4', target_wcs=None, ref_band_pixscale=None,
                 flux_or_sb=None, out_shape=None, prefix='match_', out_path=None):
     '''
     Match PSF of the images to the target filter.
@@ -77,6 +77,8 @@ def match_image(img_path, sci_img, var_img, filters,
         The list of filters to use for matching.
     ref_band: str
         The target filter to match PSF to.
+    target_wcs: astropy.wcs.WCS, optional
+        The target WCS to match to.
     ref_band_pixscale: str, optional
         The target filter to match pixel scale to.
     flux_or_sb: dict | str, optional
@@ -125,7 +127,8 @@ def match_image(img_path, sci_img, var_img, filters,
         target_pix_idx = np.where(np.abs(pix_scales - target_pix_scale) < 1e-3)[0][0]
 
     target_hdu = fits.open(img_path + sci_img[filters[target_pix_idx]])
-    target_wcs = WCS(target_hdu[0].header)
+    if target_wcs is None:
+        target_wcs = WCS(target_hdu[0].header)
 
     print(f"Matching starts!")
     print(f"Target PSF = {ref_band}")

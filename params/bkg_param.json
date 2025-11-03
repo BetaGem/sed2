@@ -438,7 +438,7 @@
         },
         "ha": {
             "box_size": 100,
-            "mask_thresh": 0,
+            "mask_thresh": 1,
             "npixels": 100
         }
     },
@@ -491,7 +491,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 200,
+            "box_size": 500,
             "mask_thresh": 5,
             "npixels": 100
         },
@@ -511,8 +511,8 @@
             "npixels": 100
         },
         "ha": {
-            "box_size": 200,
-            "mask_thresh": 1.5,
+            "box_size": 100,
+            "mask_thresh": -0.2,
             "npixels": 100
         }
     },
@@ -544,6 +544,11 @@
         },
         "MIPS": {
             "box_size": 50,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "ha": {
+            "box_size": 500,
             "mask_thresh": 3,
             "npixels": 100
         }
@@ -647,6 +652,11 @@
             "box_size": 50,
             "mask_thresh": 2,
             "npixels": 10
+        },
+        "ha": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
         }
     },
     "NGC3556": {

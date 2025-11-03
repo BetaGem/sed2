@@ -12,7 +12,8 @@ __all__ = ["galaxy_region", "flux_map", "plot_flux_maps", "plot_sample_sed"]
 
 def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
                   thresh=3, npixels=50, dilate_iter=3, 
-                  plot_region=True, out_file=None, **kwargs):
+                  plot_region=True, plot_idx=0,
+                  out_file=None, **kwargs):
     '''
     Select galaxy regions from pixel binning.
     ----------
@@ -32,6 +33,8 @@ def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
         The number of iterations for binary dilation.
     plot_region : bool
         Whether to plot the detected galaxy regions.
+    plot_idx : int
+        The index of band to plot.
     out_file : str
         The path to the output file for the galaxy region mask.
     **kwargs : keyword arguments
@@ -83,7 +86,7 @@ def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
     # plot the results
     if plot_region:
         import matplotlib.pyplot as plt
-        img = fits.open(matched_path + matched_img[0])[0].data
+        img = fits.open(matched_path + matched_img[plot_idx])[0].data
         plt.figure(figsize=(4, 4))
         plt.subplot(111)
         plt.imshow(img, origin='lower', cmap='turbo',
@@ -300,7 +303,7 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
                 sys.exit()
             
         # H-alpha images should be in Jy
-        elif filters[i][:4] in ['ctio', 'kpno', 'bok_']:
+        elif filters[i][:4] in ['ctio', 'kpno', 'bok_', 'vatt']:
             map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2        # in erg/s/cm^2/Ang.
             map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.0e-23 * 2.998e+18 / wave_piv[i]**2    # in erg/s/cm^2/Ang.
 

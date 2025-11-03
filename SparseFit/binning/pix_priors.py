@@ -3,7 +3,6 @@ from math import cos, sin, sqrt
 from astropy.io import fits
 
 from ..utils import *
-from ..path import PATH
 
 __all__ = ['estimate_metallicity', 'plot_metal_map']
 
@@ -12,7 +11,7 @@ def estimate_metallicity(pixbin_path, ref_img_path=None, logMstar=10,
                          out_path='manual_priors.npz'):
     '''
     Estimate nebular metallicity for each spatial bin based on
-    the mass-metallicity relation and a radial gradient.
+    the mass-metallicity relation and a radial gradient (J. Sun et al. 2025).
     
     Parameters:
     -----------
@@ -88,6 +87,8 @@ def estimate_eta(logMstar, out_path='manual_priors.npz'):
         npz = np.load(out_path, allow_pickle=True)
         zgas = npz['zgas'] if 'zgas' in npz else None
         np.savez(out_path, zgas=zgas, eta=eta)
+    
+    print(f"Estimated eta saved: {eta:.3f}")
 
 
 def plot_metal_map(prior_path, pixbin_path, **kwargs):

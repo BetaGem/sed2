@@ -197,6 +197,12 @@
          "psf_fwhm": 1.5,
          "default_unit": "flux"
     },
+    "vatt_halpha_658": {
+         "fname": "ha",
+         "cali_err": 5.0,
+         "psf_fwhm": 1.5,
+         "default_unit": "flux"
+    },
     "ukirt_wfcam_J": {
         "fname": "UHS_J",
         "cali_err": 2.3,

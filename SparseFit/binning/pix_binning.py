@@ -581,7 +581,6 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
             if flux_err == 0:
                 # assume Gaussian noise with noise inflation
                 flux_err = e_last * np.sqrt(2 * np.sum(bin_) / np.sum(binmap == j-1))
-                print(filters[i], j, flux_err, bin_unit, np.median(fluxmap[i][bin_]))
 
             e_last = flux_err
 

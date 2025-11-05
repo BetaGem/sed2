@@ -800,6 +800,11 @@
             "box_size": 50,
             "mask_thresh": 3,
             "npixels": 10
+        },
+        "ha": {
+            "box_size": 100,
+            "mask_thresh": 1.5,
+            "npixels": 100
         }
     },
     "NGC4244": {
@@ -1086,6 +1091,11 @@
             "box_size": 75,
             "mask_thresh": 5,
             "npixels": 100
+        },
+        "ha":{
+            "box_size": 500,
+            "mask_thresh": 2,
+            "npixels": 10
         }
     },
     "NGC4496A": {
@@ -1310,9 +1320,9 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 400,
-            "mask_thresh": 2.5,
-            "npixels": 10
+            "box_size": 200,
+            "mask_thresh": 3,
+            "npixels": 100
         }
     },
     "NGC4565": {
@@ -1406,9 +1416,9 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 100,
-            "mask_thresh": 3,
-            "npixels": 100
+            "box_size": 50,
+            "mask_thresh": 2,
+            "npixels": 10
         },
         "WISE": {
             "box_size": 50,
@@ -1812,9 +1822,9 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 100,
-            "mask_thresh": 3,
-            "npixels": 10
+            "box_size": 300,
+            "mask_thresh": 1,
+            "npixels": 100
         }
     },
     "NGC5775": {
@@ -1829,8 +1839,8 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 100,
-            "mask_thresh": 5,
+            "box_size": 50,
+            "mask_thresh": 10,
             "npixels": 10
         },
         "WISE": {
@@ -1942,7 +1952,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 50,
+            "box_size": 500,
             "mask_thresh": 5,
             "npixels": 10
         },
@@ -1964,6 +1974,11 @@
         "Herschel": {
             "box_size": 20,
             "mask_thresh": 2,
+            "npixels": 10
+        },
+        "ha": {
+            "box_size": 100,
+            "mask_thresh": 1,
             "npixels": 10
         }
     }

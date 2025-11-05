@@ -35,24 +35,24 @@ def save_json(dict, path):
         json.dump(dict, f, indent=4)
         
 
-def check_image(gal_name, filter_name):
+def check_image(path, gal_name, filter_name):
     '''
     check whether an image exists.
     '''
     import os
     tarf = file_name(filter_name)
     try:
-        for fname in os.listdir(f"{PATH}/data/{gal_name}/masked"):
+        for fname in os.listdir(f"{path}/data/{gal_name}/image"):
             if tarf in fname and gal_name in fname and ".fits" in fname: 
                 return True
     except: 
         return False
 
 
-def check_halpha(gal_name):
+def check_halpha(path, gal_name):
     import os
     try:
-        for fname in os.listdir(f"{PATH}/data/{gal_name}/masked"):
+        for fname in os.listdir(f"{path}/data/{gal_name}/image"):
             if "ha" in fname and ".fits" in fname: 
                 return True
     except: 

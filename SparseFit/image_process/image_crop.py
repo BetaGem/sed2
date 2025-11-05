@@ -97,8 +97,12 @@ def crop(img_path, sci_img, var_img, filters, robust=False,
     
     # load geometry
     if galaxy is not None:
-        coord = SkyCoord.from_name(galaxy)
-        ra, dec = coord.ra.value, coord.dec.value
+        try:
+            coord = SkyCoord.from_name(galaxy)
+            ra, dec = coord.ra.value, coord.dec.value
+        except:
+            if ra is None or dec is None:
+                raise ValueError(f"Failed to resolve {galaxy}, RA and DEC should be specified.")
         crop_size = load_ref_info(galaxy)[2]
 
     if isinstance(crop_size, int):

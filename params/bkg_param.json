@@ -583,6 +583,11 @@
             "box_size": 15,
             "mask_thresh": 3,
             "npixels": 100
+        },
+        "ha": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
         }
     },
     "NGC3486": {
@@ -1501,7 +1506,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 100,
+            "box_size": 200,
             "mask_thresh": 3,
             "npixels": 10
         },
@@ -1519,6 +1524,11 @@
             "box_size": 25,
             "mask_thresh": 3,
             "npixels": 10
+        },
+        "ha": {
+            "box_size": 500,
+            "mask_thresh": 1,
+            "npixels": 100
         }
     },
     "NGC4725": {

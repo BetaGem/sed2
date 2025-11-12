@@ -160,16 +160,15 @@ def build_all(ID, flux_table, filter_list=None,
     # load priors calibrated from spectroscopic data
     ## you can modify this part to load your own priors
     ## by default, the priors are produces in SparseFit.binning.pix_priors
-    if manual_prior is not None:
+    zgas, dust_ratio = None, None
 
+    if manual_prior is not None:
         prior_npz = np.load(manual_prior)
         if 'zgas' in prior_npz:
             zgas = prior_npz['zgas'][ID]
-        else: zgas = None
 
         if 'eta' in prior_npz:
             dust_ratio = prior_npz['eta']
-        else: dust_ratio = None
 
     # initialize fini
     fini = np.full_like(filters, True)

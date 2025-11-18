@@ -165,7 +165,10 @@ def build_all(ID, flux_table, filter_list=None,
     if manual_prior is not None:
         prior_npz = np.load(manual_prior)
         if 'zgas' in prior_npz:
-            zgas = prior_npz['zgas'][ID]
+            try:
+                zgas = prior_npz['zgas'][ID]
+            except IndexError:
+                zgas = np.nanmean(prior_npz['zgas'])
 
         if 'eta' in prior_npz:
             dust_ratio = prior_npz['eta']

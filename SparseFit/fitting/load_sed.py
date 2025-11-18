@@ -246,7 +246,7 @@ class BSEDresults(object):
         return chi2_rd
 
 
-    def dust_mass(self):
+    def dust_mass(self, n_boot=1):
         """
         Estimate dust mass from the samples.
         """
@@ -258,7 +258,7 @@ class BSEDresults(object):
         _z = sed._get_redshift()
 
         dust_masses = []
-        for i in range(1):
+        for i in range(n_boot):
             post.fitted_model._update_model_components(post.samples2d[i, :])
             
             model = model_galaxy(post.fitted_model.model_components,
@@ -275,14 +275,16 @@ class BSEDresults(object):
                                             umin=sed.fit.posterior.samples['dust:umin'][i],
                                             gamma=sed.fit.posterior.samples['dust:gamma'][i])
 
-            # unit conversion (magic)
+            # unit conversion (m_sun/ m_H)
             dust_spec *= wav**2 * 1e3 / ((4 * np.pi) * (sed.distance * 3.086e24)**2) * (1.989e33 / 1.6736e-24)
             obs_spec = model.spectrum_full[fir_idx] * wav**2 * 3.3356e4  # Jy
             dust_masses.append(np.median(obs_spec / dust_spec))
 
         del sed
         # return np.percentile(dust_masses, (16, 50, 84))
-        return np.mean(dust_masses)
+        median = np.median(dust_masses)
+        std = 1.253 * np.std(dust_masses, ddof=1) if n_boot > 1 else 0.
+        return median, std
 
 
     def predict_flux(self, filter_name):

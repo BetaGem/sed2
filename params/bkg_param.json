@@ -85,7 +85,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 100,
+            "box_size": 500,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -1526,8 +1526,8 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 500,
-            "mask_thresh": 1,
+            "box_size": 200,
+            "mask_thresh": 0.5,
             "npixels": 100
         }
     },

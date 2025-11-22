@@ -1,10 +1,9 @@
 import os
-from time import time
 import astropy.units as u
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
-# from skimage.restoration import inpaint_biharmonic
-from photutils.background import BkgZoomInterpolator, BkgIDWInterpolator
+from photutils.segmentation import deblend_sources
+
 from .image_bkg import *
 
 
@@ -87,11 +86,13 @@ def get_tractor_catalog(ralo, rahi, declo, dechi):
 def get_photoz(sweep_cat, release, brickid, objid):
 
     # z_idx = np.where((sweep_cat['RELEASE'] == release) & (sweep_cat['BRICKID'] == brickid) & (sweep_cat['OBJID'] == objid))
-    z_idx = np.where((sweep_cat['BRICKID'] == brickid) & (sweep_cat['OBJID'] == objid))
-    z_mean = sweep_cat['Z_PHOT_MEAN'][z_idx]
-    z_std  = sweep_cat['Z_PHOT_STD' ][z_idx]
-    z_L95  = sweep_cat['Z_PHOT_L95' ][z_idx]
-    z_U95  = sweep_cat['Z_PHOT_U95' ][z_idx]
+    z_idx = np.where((sweep_cat['BRICKID'] == brickid) & (sweep_cat['OBJID'] == objid))[0]
+    if len(z_idx) == 0:
+        return 99, 1, 99, 99
+    z_mean = np.array(sweep_cat['Z_PHOT_MEAN'])[z_idx]
+    z_std  = np.array(sweep_cat['Z_PHOT_STD' ])[z_idx]
+    z_L95  = np.array(sweep_cat['Z_PHOT_L95' ])[z_idx]
+    z_U95  = np.array(sweep_cat['Z_PHOT_U95' ])[z_idx]
 
     return z_mean, z_std, z_L95, z_U95
 
@@ -123,8 +124,6 @@ def center_stars(name, hdu, seg_center, year_to_gaia=-12, coord=None):
     '''
     gaia stars within inner mask
     '''
-    from photutils.detection import DAOStarFinder
-    from photutils import Background2D
 
     if coord is None: coord = SkyCoord.from_name(name)
     gal_ra, gal_dec = coord.ra.value, coord.dec.value
@@ -232,9 +231,14 @@ def get_catalogs(name, ref_hdu, seg_center, gal_z=0, coord=None, year_to_gaia=-1
     if name in ['NGC7331', 'SexB']:
         csources = []
     else:
-        photoz  = get_sweep_photoz(ralo, rahi, declo, dechi)
-        tractor = get_tractor_catalog(ralo, rahi, declo, dechi)
-        csources = get_high_z_source(ref_hdu, tractor, photoz, seg_center, gal_z)
+        try:
+            photoz  = get_sweep_photoz(ralo, rahi, declo, dechi)
+            tractor = get_tractor_catalog(ralo, rahi, declo, dechi)
+            csources = get_high_z_source(ref_hdu, tractor, photoz, seg_center, gal_z)
+        except: 
+            # in case of no internet connection
+            print("Warning: Get high-z source from Legacy Survey failed ...")
+            csources = []
 
     return cstars, csources
 
@@ -244,7 +248,7 @@ def mask_one_band_inner(name, sci_file, cstars, csources,
     '''
     generate inner mask for the current band.
     '''
-    cur_img = f'{PATH}/{name}/crop/crop_{sci_file}'
+    cur_img = f'{PATH}/{name}/cropped/crop_{sci_file}'
     cur_hdu = fits.open(cur_img)
     cur_wcs = WCS(cur_hdu[0].header)
     
@@ -299,7 +303,7 @@ def mask_one_band_inner(name, sci_file, cstars, csources,
 
 def mask_one_band_outer(name, sci_file, center_mask, nsigma=3, fwhm=1, dilate=0, deblend=False, clean=True):
 
-    cur_img = f'{PATH}/{name}/crop/crop_{sci_file}'
+    cur_img = f'{PATH}/{name}/cropped/crop_{sci_file}'
     cur_hdu = fits.open(cur_img)
     cur_wcs = WCS(cur_hdu[0].header)
 
@@ -346,9 +350,11 @@ def load_circ_mask(gname, fname):
 
 
 def interp_image(cur_hdu, mask, region_in, box_size=3):
-    '''fill the mask with interpolation and noise'''
-
-    mask_type = mask.astype(int) * ((region_in > 0.5).astype(int) + 1) # inner mask has type==2
+    '''
+    fill the mask with interpolation and noise
+    '''
+    # inner mask has mask_type == 2
+    mask_type = mask.astype(int) * ((region_in > 0.5).astype(int) + 1) 
 
     img_clean  = cur_hdu.data.copy()
     # fill outer mask with noise

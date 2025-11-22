@@ -494,7 +494,7 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
         A list of flux uncertainties for each bin.
     '''
     from tqdm import tqdm
-    from scipy.interpolate import CubicSpline
+    # from scipy.interpolate import CubicSpline
 
     # load binning data
     hdu = fits.open(pixbin_path)
@@ -517,15 +517,15 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
 
     # wise corrections 
     # https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html
-    w12_vega = np.array([-0.4040, -0.0538, 0.2939, 0.6393, 0.9828, 1.3246, 1.6649, 2.0041])
-    w_fc = np.array([[1.0283, 1.0084, 0.9961, 0.9907, 0.9921, 1, 1.0142, 1.0347],
-                     [1.0206, 1.0066, 0.9976, 0.9935, 0.9943, 1, 1.0107, 1.0265],
-                     [1.1344, 1.0088, 0.9393, 0.9169, 0.9373, 1, 1.1081, 1.2687], 
-                     [1.0142, 1.0013, 0.9934, 0.9905, 0.9926, 1, 1.0130, 1.0319]])
+    # w12_vega = np.array([-0.4040, -0.0538, 0.2939, 0.6393, 0.9828, 1.3246, 1.6649, 2.0041])
+    # w_fc = np.array([[1.0283, 1.0084, 0.9961, 0.9907, 0.9921, 1, 1.0142, 1.0347],
+    #                  [1.0206, 1.0066, 0.9976, 0.9935, 0.9943, 1, 1.0107, 1.0265],
+    #                  [1.1344, 1.0088, 0.9393, 0.9169, 0.9373, 1, 1.1081, 1.2687], 
+    #                  [1.0142, 1.0013, 0.9934, 0.9905, 0.9926, 1, 1.0130, 1.0319]])
     w_zpc = np.array([0.034, 0.041, -0.030, 0.029])
 
     # interpolate
-    inter = [CubicSpline(w12_vega, w_fc[i]) for i in range(4)]
+    # inter = [CubicSpline(w12_vega, w_fc[i]) for i in range(4)]
 
     # get band index for corrections
     mir = get_mirband_idx(filters)
@@ -539,9 +539,9 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
         w2_flux = fluxmap[mir[1], r[0], c[0]] * unit_flux
         w12 = -2.5 * np.log10(w1_flux*33526**2 / (w2_flux*46028**2)) + 3.339 - 2.699 # AB to vega
 
-        # apply corrections
-        for n, l in enumerate(mir[:4]):
-            fluxmap[l, r, c] *= inter[n](w12)
+        # apply wise color corrections
+        # for n, l in enumerate(mir[:4]):
+        #     fluxmap[l, r, c] *= inter[n](w12)
 
         # IRAC corrections
         # https://irsa.ipac.caltech.edu/data/SPITZER/docs/irac/iracinstrumenthandbook/46/#_Toc82083698

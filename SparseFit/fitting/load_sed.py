@@ -282,9 +282,7 @@ class BSEDresults(object):
 
         del sed
         # return np.percentile(dust_masses, (16, 50, 84))
-        median = np.median(dust_masses)
-        std = 1.253 * np.std(dust_masses, ddof=1) if n_boot > 1 else 0.
-        return median, std
+        return np.log10(np.percentile(dust_masses, (16, 50, 84)))
 
 
     def predict_flux(self, filter_name):

@@ -48,13 +48,25 @@ def dilate(radius_idx, maskim, psf_px):
     '''
     import scipy.ndimage as ndimage
     
-    hfpsf = max(round(radius_idx * psf_px), 1)
-    tmp = ndimage.binary_opening(maskim, np.ones((hfpsf, hfpsf)))
+    # ensure boolean array
+    mask_bool = maskim.astype(bool)
+
     radius = max(round(radius_idx * psf_px), 1)
-    struct = np.arange(-radius, radius+1)**2 \
-             + np.arange(-radius, radius+1).reshape((-1, 1))**2 \
-             <= radius**2
-    ndimage.binary_dilation(tmp, struct, output=maskim)
+    yy = np.arange(-radius, radius+1)
+    xx = yy.reshape((-1, 1))
+    struct = (xx**2 + yy**2) <= radius**2
+
+    # Apply dilation directly. 
+    # Previously a binary_opening was applied first,
+    # which eroded small regions (smaller than the opening kernel).
+    dilated = ndimage.binary_dilation(mask_bool, structure=struct)
+
+    # write back to input array in-place if possible
+    try:
+        maskim[...] = dilated.astype(maskim.dtype)
+    except Exception:
+        # fallback: return the dilated array
+        return dilated.astype(maskim.dtype)
 
 
 def mask_region_bgmodel(data, thresh=3, model_percent=86, npixels=10, 
@@ -101,7 +113,7 @@ def reference_mask(path, fits_image, name_out_mask=None,
         name_out_mask = path + "ref_mask.fits"
     fits.writeto(name_out_mask, mask.astype(np.int8), hdu.header, overwrite=True)
 
-    plt.figure(figsize=(6,6))
+    plt.figure(figsize=(4, 4))
     plt.imshow(hdu.data, vmax=np.nanpercentile(hdu.data, 95), origin='lower')
     plt.imshow(mask, cmap='gray', alpha=.3, origin='lower')
     plt.savefig(name_out_mask + ".jpg", dpi=300)
@@ -134,18 +146,18 @@ def subtract_background(path, fits_image, hdu_idx=0, sigma=3.0,
                                                     npixels=npixels,
                                                     verbose=verbose)
     else:
-        mask_region0 = np.zeros_like(data_image)
+        mean, med, std = sigma_clipped_stats(data_image)
+        segm = detect_sources(data_image, threshold=mean + mask_thresh * std, npixels=npixels)
+        mask_region0 = (segm.data > 0).astype(int)
         box_max = min(dim_x, dim_y) // 2
+    
     if box_size is None:
         box_size = min(dim_x, dim_y) // (min(dim_x, dim_y) // box_max)
         box_size = [box_size, box_size]
 
     print("box size for background estimation =", box_size)
-    # if is_ref_band:
-    #     name_out_mask = path + "ref_mask.fits"
-    #     fits.writeto(name_out_mask, mask_region0.astype('>f4'), header, overwrite=True)
 
-    if mask_ref is None: # or is_ref_band:
+    if mask_ref is None:
         mask_region1 = mask_region0
     else:
         mask_region = mask_reproject(mask_ref, header)
@@ -157,8 +169,8 @@ def subtract_background(path, fits_image, hdu_idx=0, sigma=3.0,
             rows, cols = np.where((mask_region0==1) | (mask_region==1))
             mask_region1[rows, cols] = 1
 
-    # dilate mask by 5 pixel (to be improved)
-    dilate(1, mask_region1, 5)
+    # dilate mask by 3 pixels
+    dilate(1, mask_region1, 3)
 
     if plot_mask:
         plt.imshow(data_image, 
@@ -170,15 +182,13 @@ def subtract_background(path, fits_image, hdu_idx=0, sigma=3.0,
         plt.show()
 
     # final background
-    # cenfunc = 'median' if gaussian_noise else 'mean'
-    # sigma_clip = SigmaClip(sigma=sigma, maxiters=5, 
-                           # cenfunc=cenfunc, stdfunc='std', grow=False)
     sigma_clip = SigmaClip(sigma=sigma, maxiters=1,
                            cenfunc='median', stdfunc='std', grow=False)
     if gaussian_noise:
         bkg_estimator = SExtractorBackground()
     else:
         bkg_estimator = MeanBackground()
+        
     bkg = Background2D(data_image, 
                        (box_size[0], box_size[1]), 
                        filter_size=3, 

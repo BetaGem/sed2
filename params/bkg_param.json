@@ -31,7 +31,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 100,
+            "box_size": 250,
             "mask_thresh": 3,
             "npixels": 100
         }
@@ -75,9 +75,9 @@
     },
     "NGC0628": {
         "GALEX": {
-            "box_size": 200,
+            "box_size": 500,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -105,7 +105,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
+            "box_size": 500,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -311,7 +311,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 50,
+            "box_size": 100,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -326,7 +326,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
+            "box_size": 200,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -432,7 +432,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
+            "box_size": 600,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -459,7 +459,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 100,
+            "box_size": 300,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -474,7 +474,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
+            "box_size": 200,
             "mask_thresh": 2,
             "npixels": 10
         }
@@ -654,7 +654,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
+            "box_size": 400,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -765,8 +765,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },
@@ -802,8 +802,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -844,8 +844,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },
@@ -881,8 +881,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -1056,8 +1056,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -1246,8 +1246,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },
@@ -1268,7 +1268,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 100,
+            "box_size": 200,
             "mask_thresh": 3,
             "npixels": 10
         },
@@ -1278,13 +1278,13 @@
             "npixels": 100
         },
         "MIPS": {
-            "box_size": 50,
+            "box_size": 200,
             "mask_thresh": 3,
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },
@@ -1310,9 +1310,9 @@
             "npixels": 10
         },
         "IRAC": {
-            "box_size": 200,
-            "mask_thresh": 3,
-            "npixels": 100
+            "box_size": 600,
+            "mask_thresh": 2,
+            "npixels": 10
         },
         "MIPS": {
             "box_size": 50,
@@ -1320,8 +1320,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -1399,8 +1399,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -1441,7 +1441,7 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
+            "box_size": 150,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -1521,8 +1521,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 25,
-            "mask_thresh": 3,
+            "box_size": 400,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -1696,7 +1696,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 200,
+            "box_size": 1300,
             "mask_thresh": 3,
             "npixels": 10
         },
@@ -1711,8 +1711,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         },
         "ha": {
@@ -1738,7 +1738,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 100,
+            "box_size": 600,
             "mask_thresh": 3,
             "npixels": 10
         },
@@ -1753,8 +1753,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },
@@ -1790,8 +1790,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 500,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },
@@ -1817,8 +1817,8 @@
             "npixels": 10
         },
         "IRAC": {
-            "box_size": 100,
-            "mask_thresh": 3,
+            "box_size": 400,
+            "mask_thresh": 1,
             "npixels": 10
         },
         "MIPS": {
@@ -1827,7 +1827,7 @@
             "npixels": 10
         },
         "Herschel": {
-            "box_size": 20,
+            "box_size": 200,
             "mask_thresh": 2,
             "npixels": 10
         },

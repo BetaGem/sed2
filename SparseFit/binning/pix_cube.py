@@ -359,7 +359,6 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
     return name_out_fits
 
 
-
 def plot_flux_maps(cube_path, out_path=None):
     """
     Plot the flux maps from the given SED data cube.

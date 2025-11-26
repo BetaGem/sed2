@@ -545,7 +545,7 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
 
         # IRAC corrections
         # https://irsa.ipac.caltech.edu/data/SPITZER/docs/irac/iracinstrumenthandbook/46/#_Toc82083698
-        cal_IRAC = np.array([0.91, 0.94, 0.70, 0.74])
+        cal_IRAC = np.array([0.91, 0.94, 0.66, 0.74])
         for n, l in enumerate(mir[4:]):
             if l < 0: continue
             fluxmap[l, r, c] *= cal_IRAC[n]

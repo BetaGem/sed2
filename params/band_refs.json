@@ -52,7 +52,7 @@
     "NGC0864": {
         "filter": "GALEX_NUV",
         "nsigma": 1.5,
-        "size": 401,
+        "size": 201,
         "mask":[
             3,
             3,
@@ -92,7 +92,7 @@
     "NGC2541": {
         "filter": "GALEX_NUV",
         "nsigma": 2.0,
-        "size": 401,
+        "size": 201,
         "mask": [
             3,
             3,
@@ -404,7 +404,7 @@
         "nsigma": 2,
         "size": 91,
         "mask": [
-            2,
+            3,
             3,
             3
         ]
@@ -552,7 +552,7 @@
     "SexB": {
         "filter": "SDSS_r",
         "nsigma": 1.5,
-        "size": 151,
+        "size": 101,
         "mask": [
             3,
             5,

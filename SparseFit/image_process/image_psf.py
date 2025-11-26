@@ -120,11 +120,11 @@ def match_image(img_path, sci_img, var_img, filters,
         pix_scales[i] = get_pixel_size(img_path + img)
 
     if ref_band_pixscale is not None:
-        target_pix_idx = np.where(np.array(filters) == ref_band_pixscale)[0][0]
+        target_pix_idx = np.where(np.abs(pix_scales - ref_band_pixscale) < 1e-2)[0][0]
         target_pix_scale = pix_scales[target_pix_idx]
     else:
         target_pix_scale = np.max(pix_scales[high_res_filt_flg])
-        target_pix_idx = np.where(np.abs(pix_scales - target_pix_scale) < 1e-3)[0][0]
+        target_pix_idx = np.where(np.abs(pix_scales - target_pix_scale) < 1e-2)[0][0]
 
     target_hdu = fits.open(img_path + sci_img[filters[target_pix_idx]])
     if target_wcs is None:

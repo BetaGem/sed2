@@ -1,9 +1,9 @@
 {
     "IC1613": {
         "GALEX": {
-            "box_size": 250,
+            "box_size": 300,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -296,9 +296,9 @@
     },
     "NGC2841": {
         "GALEX": {
-            "box_size": 200,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 400,
+            "mask_thresh": 2,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -402,9 +402,9 @@
     },
     "NGC3198": {
         "GALEX": {
-            "box_size": 150,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 300,
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 1000,
@@ -423,7 +423,7 @@
         },
         "IRAC": {
             "box_size": 200,
-            "mask_thresh": 3,
+            "mask_thresh": 2,
             "npixels": 100
         },
         "MIPS": {
@@ -464,7 +464,7 @@
             "npixels": 100
         },
         "IRAC": {
-            "box_size": 100,
+            "box_size": 300,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -624,9 +624,9 @@
     },
     "NGC3521": {
         "GALEX": {
-            "box_size": 100,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 400,
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -736,7 +736,7 @@
     "NGC3718": {
         "GALEX": {
             "box_size": 500,
-            "mask_thresh": 3,
+            "mask_thresh": 5,
             "npixels": 100
         },
         "SDSS": {
@@ -772,9 +772,9 @@
     },
     "NGC4214": {
         "GALEX": {
-            "box_size": 150,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 300,
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -814,9 +814,9 @@
     },
     "NGC4244": {
         "GALEX": {
-            "box_size": 100,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 200,
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 200,
@@ -851,9 +851,9 @@
     },
     "NGC4254": {
         "GALEX": {
-            "box_size": 150,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 200,
@@ -1027,8 +1027,8 @@
     "NGC4449": {
         "GALEX": {
             "box_size": 300,
-            "mask_thresh": 10,
-            "npixels": 100
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 300,
@@ -1369,9 +1369,9 @@
     },
     "NGC4618": {
         "GALEX": {
-            "box_size": 100,
+            "box_size": 250,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 200,
@@ -1421,9 +1421,9 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 50,
+            "box_size": 400,
             "mask_thresh": 2,
-            "npixels": 10
+            "npixels": 100
         },
         "WISE": {
             "box_size": 50,
@@ -1441,8 +1441,8 @@
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 150,
-            "mask_thresh": 2,
+            "box_size": 50,
+            "mask_thresh": 3,
             "npixels": 10
         },
         "ha": {
@@ -1717,15 +1717,15 @@
         },
         "ha": {
             "box_size": 500,
-            "mask_thresh": 3,
+            "mask_thresh": 1,
             "npixels": 10
         }
     },
     "NGC5248": {
         "GALEX": {
-            "box_size": 150,
+            "box_size": 500,
             "mask_thresh": 10,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -1760,9 +1760,9 @@
     },
     "NGC5457": {
         "GALEX": {
-            "box_size": 500,
+            "box_size": 1000,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 4000,
@@ -1799,7 +1799,7 @@
         "GALEX": {
             "box_size": 500,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -1827,7 +1827,7 @@
             "npixels": 10
         },
         "Herschel": {
-            "box_size": 200,
+            "box_size": 100,
             "mask_thresh": 2,
             "npixels": 10
         },

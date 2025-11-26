@@ -103,7 +103,7 @@
     },
     "spitzer_irac_58": {
         "fname": "Spitzer_5.8",
-        "cali_err": 3.0,
+        "cali_err": 10.0,
         "psf_fwhm": 2.11,
         "default_unit": "sb"
     },

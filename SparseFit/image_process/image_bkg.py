@@ -94,7 +94,7 @@ def mask_region_bgmodel(data, thresh=3, model_percent=86, npixels=10,
 
 
 def reference_mask(path, fits_image, name_out_mask=None,
-                   nsigma=3, npixels=100, smooth=0, dilate=5):
+                   nsigma=3, npixels=200, smooth=0, dilate=5):
     '''
     generate mask for the reference band
     '''

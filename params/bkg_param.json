@@ -6,9 +6,9 @@
             "npixels": 10
         },
         "SDSS": {
-            "box_size": 500,
+            "box_size": 1000,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 300
         },
         "2MASS": {
             "box_size": 500,
@@ -196,7 +196,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 500,
+            "box_size": 350,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -279,7 +279,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 500,
+            "box_size": 250,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -528,8 +528,8 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 200,
-            "mask_thresh": 5,
+            "box_size": 400,
+            "mask_thresh": 3,
             "npixels": 100
         },
         "WISE": {

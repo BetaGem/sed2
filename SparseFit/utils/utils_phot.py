@@ -73,7 +73,7 @@ def k_extinction(lamb_Ang, Rv=3.1):
 
 
 def bin_noise(img, bin_mask, aper_src=None, mask_src=None, 
-              bootstrap=100, max_overlap=0.1):
+              bootstrap=100, max_overlap=0.1, circle_aper=False):
     '''
     Estimate the uncertainties by randomly sampling the blank sky.
 
@@ -91,6 +91,8 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None,
         The number of bootstrap samples to draw.
     max_overlap : float
         The maximum allowed overlap between the random apertures.
+    circle_aper : bool
+        Whether to use circular apertures for random sampling.
 
     Returns
     -------
@@ -119,7 +121,7 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None,
         mask = mask_src.copy().astype(bool)
 
     # calculate shape parameters of the bin
-    if np.sum(bin_mask) >= 5:
+    if np.sum(bin_mask) >= 5 and not circle_aper:
         a, b = get_a_b_ellipse(bin_mask)
     else:
         a = np.sqrt(np.nansum(bin_mask) / np.pi)

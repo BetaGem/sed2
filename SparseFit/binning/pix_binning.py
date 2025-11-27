@@ -54,7 +54,7 @@ def get_neighboring_pixels(arr, dilate_pix):
 
 
 def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_limit=4.0, 
-                  r_growth=1.0, dr_growth=1.0, grow_percentile=50, out_SNR_factor=1.0,
+                  r_growth=1, dr_growth=1, grow_percentile=50, out_SNR_factor=1.0,
                   connected=True, out_path=None, verbose=False):
     """
     A modified function for pixel binning based on piXedfit.piXedfit_bin (Abdurro'uf et al. 2021)
@@ -81,10 +81,10 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     redc_chi2_limit : float
         A maximum reduced chi-square value for a pair of two SEDs to be considered as having a similar shape.
 
-    r_growth : float
+    r_growth : int
         Increment of pixels in each iteration when growing the bins.
 
-    out_SNR_factor : float
+    out_SNR_factor : int
         The S/N thresholds for the last bin are multiplied by this factor.
 
     grow_percentile : float, 0 < grow_percentile < 100
@@ -577,7 +577,7 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
             if flux_err == 0:
                 # increase bootstrap samples and retry
                 flux_err, _ = bin_noise(img, bin_mask=bin_, 
-                                        mask_src=msk, bootstrap=bootstrap*3)
+                                        mask_src=msk, bootstrap=bootstrap, circle_aper=True)
             if flux_err == 0:
                 # assume Gaussian noise with noise inflation
                 flux_err = e_last * np.sqrt(2 * np.sum(bin_) / np.sum(binmap == j-1))

@@ -281,7 +281,6 @@ class BSEDresults(object):
             dust_masses.append(np.median(obs_spec / dust_spec))
 
         del sed
-        # return np.percentile(dust_masses, (16, 50, 84))
         return np.log10(np.percentile(dust_masses, (16, 50, 84)))
 
 

@@ -1078,8 +1078,8 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 50,
-            "mask_thresh": 5,
+            "box_size": 400,
+            "mask_thresh": 3,
             "npixels": 100
         },
         "WISE": {
@@ -1827,7 +1827,7 @@
             "npixels": 10
         },
         "Herschel": {
-            "box_size": 100,
+            "box_size": 50,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -1987,7 +1987,7 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 100,
+            "box_size": 500,
             "mask_thresh": 1,
             "npixels": 10
         }

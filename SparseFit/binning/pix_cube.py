@@ -240,11 +240,7 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
         # 2MASS (the image is in DN)
         elif filters[i] in ['2mass_j', '2mass_h', '2mass_k']:
             # flux
-            r1, c1 = np.where((gal_region) & (sci_img_data > 0))
-            map_flux[i][r1,c1] = FLUXZP_2mass * sci_img_data[r1,c1] * 10**(-0.4 * MAGZP_2mass) * 1.0e+3  # in erg/s/cm^2/Ang.
-
-            r2, c2 = np.where((gal_region) & (sci_img_data <= 0))
-            map_flux[i][r2,c2] = -FLUXZP_2mass * sci_img_data[r2,c2] * 10**(-0.4 * MAGZP_2mass) * 1.0e+3  # in erg/s/cm^2/Ang.
+            map_flux[i][r,c] = FLUXZP_2mass * sci_img_data[r,c] * 10**(-0.4 * MAGZP_2mass) * 1.0e+3  # in erg/s/cm^2/Ang.
 
             # flux error
             map_flux_err[i][r,c] = FLUXZP_2mass * np.sqrt(np.abs(var_img_data[r,c])) * 10**(-0.4 * MAGZP_2mass) * 1.0e+3  # in erg/s/cm^2/Ang.

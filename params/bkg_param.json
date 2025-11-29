@@ -11,7 +11,7 @@
             "npixels": 300
         },
         "2MASS": {
-            "box_size": 500,
+            "box_size": 200,
             "mask_thresh": 1,
             "npixels": 100
         },
@@ -48,7 +48,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 200,
+            "box_size": 100,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -279,7 +279,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 250,
+            "box_size": 100,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -1004,9 +1004,9 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 100,
-            "mask_thresh": 5,
-            "npixels": 10
+            "box_size": 300,
+            "mask_thresh": 2,
+            "npixels": 200
         },
         "WISE": {
             "box_size": 600,

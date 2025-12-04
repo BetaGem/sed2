@@ -1669,13 +1669,13 @@
             "npixels": 100
         },
         "MIPS": {
-            "box_size": 25,
+            "box_size": 100,
             "mask_thresh": 3,
             "npixels": 100
         },
         "Herschel": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 200,
+            "mask_thresh": 2,
             "npixels": 10
         }
     },

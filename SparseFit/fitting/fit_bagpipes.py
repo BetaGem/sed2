@@ -39,6 +39,8 @@ def load_phot(ID):
         max_snr = 20
         if ID == 9999 and 'mips' in filters[i]: 
             max_snr = 10
+        if len(filters) == 19 and 'herschel_spire_500' in filters and 'spitzer_irac_24' in filters and "2mass" in filters[i]:
+            max_snr = 1 # temporalily set max_snr=1 for IC1613 2MASS filters
 
         if photometry[i, 0] / photometry[i, 1] > max_snr:
             photometry[i, 1] = photometry[i, 0] / max_snr
@@ -100,7 +102,6 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
         continuity = {}
         continuity["massformed"] = (4, 12)
         continuity["metallicity"] = (0.01, 3)
-        continuity["metallicity_prior"] = "log_10"
         if use_halpha:
             continuity['bin_edges'] = [0, 10, 30, 100, 300, 
                                        1000, 3000, 7000, _age_myr]

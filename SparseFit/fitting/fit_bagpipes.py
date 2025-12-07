@@ -39,8 +39,6 @@ def load_phot(ID):
         max_snr = 20
         if ID == 9999 and 'mips' in filters[i]: 
             max_snr = 10
-        if len(filters) == 19 and 'herschel_spire_500' in filters and 'spitzer_irac_24' in filters and "2mass" in filters[i]:
-            max_snr = 1 # temporalily set max_snr=1 for IC1613 2MASS filters
 
         if photometry[i, 0] / photometry[i, 1] > max_snr:
             photometry[i, 1] = photometry[i, 0] / max_snr

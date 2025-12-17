@@ -28,8 +28,10 @@ class BSEDresults(object):
         self.galaxy, self.fit_info = script.build_all(ID, flux_table,
                                                       filter_list, redshift,
                                                       manual_prior=manual_prior)
-        self.fit = pipes.fit(self.galaxy, self.fit_info, run=self.run, 
-                             path=path_posterior)  # TODO: Remove the path when publishing 
+        # TODO: Remove the path when publishing
+        self.fit = pipes.fit(self.galaxy, self.fit_info,
+                             run=self.run, n_posterior=1000,
+                             path=path_posterior)  
         if advanced:
             # WARNING: this is memory intensive
             # The program may crash when loading too many objects in this mode
@@ -184,7 +186,7 @@ class BSEDresults(object):
             ages = np.log10(ages) + 6
             post = np.log10(post)
             mass = self._get_sample_percentiles('stellar_mass')[1]
-            plt.figure(figsize=(4, 3))
+            
             plt.plot(ages, post[:, 1], c='k', lw=1)
             plt.fill_between(ages, post[:, 0], post[:, 2], alpha=.1, fc='r', lw=0)
             plt.ylim(mass + minssfr, mass + maxssfr)

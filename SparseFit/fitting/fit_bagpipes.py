@@ -20,7 +20,7 @@ def load_phot(ID):
     # flux in unit of erg/s/cm^2/Angstrom
     if ID == 9999:
         f_lamb = np.nansum(list(catalog.values()), axis=1)[1:]
-        f_lamb_err = np.sqrt(np.nansum(np.square(list(catalog_err.values())), axis=1))[1:]
+        f_lamb_err = np.nansum(list(catalog_err.values()), axis=1)[1:]
     else:
         f_lamb = np.array(list(catalog[ID].values()))[1:]
         f_lamb_err = np.array(list(catalog_err[ID].values()))[1:]
@@ -99,7 +99,7 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     if Leja_SFH:
         continuity = {}
         continuity["massformed"] = (4, 12)
-        continuity["metallicity"] = (0.01, 3)
+        continuity["metallicity"] = (0.02, 2.5)    
         if use_halpha:
             continuity['bin_edges'] = [0, 10, 30, 100, 300, 
                                        1000, 3000, 7000, _age_myr]
@@ -167,7 +167,8 @@ def build_all(ID, flux_table, filter_list=None,
             try:
                 zgas = prior_npz['zgas'][ID]
             except IndexError:
-                zgas = np.nanmean(prior_npz['zgas'])
+                zgas = prior_npz['zgas'][0]
+                # zgas = np.nanmean(prior_npz['zgas'])
 
         if 'eta' in prior_npz:
             dust_ratio = prior_npz['eta']
@@ -188,7 +189,7 @@ def build_all(ID, flux_table, filter_list=None,
 
 def run(ID, flux_table, manual_prior=None, 
         filter_list=None, redshift=0.0022, 
-        run='.', nlive=1000, pool=1, verbose=True):
+        run='.', nlive=1000, pool=1, verbose=True, **kwargs):
     '''
     Run Bagpipes SED fitting.
     '''
@@ -198,4 +199,4 @@ def run(ID, flux_table, manual_prior=None,
 
     fit = pipes.fit(galaxy, fit_inst, run=run)
     fit.fit(sampler="nautilus", 
-            verbose=verbose, n_live=nlive, pool=pool)
+            verbose=verbose, n_live=nlive, pool=pool, **kwargs)

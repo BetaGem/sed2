@@ -11,11 +11,13 @@ __all__ = ["BSEDresults"]
 
 class BSEDresults(object):
     """
-    Class to handle SED fitting results from Bagpipes.
+    Class to handle SED fitting results from Bagpipes
+    (assuming a non-parametric SFH).
     """
     def __init__(self, name, ID, flux_table, manual_prior=None,
-                 filter_list=None, redshift=0.0022, run='',
-                 advanced=True, distance=0, path_posterior=''):
+                 filter_list=None, redshift=0.0022, distance=0, run='',
+                 advanced=False, path_posterior='', n_posterior=1000,
+                 save_memory=False):
         """
         Initialize the SEDresults object with the result files.
         """
@@ -30,17 +32,25 @@ class BSEDresults(object):
                                                       manual_prior=manual_prior)
         # TODO: Remove the path when publishing
         self.fit = pipes.fit(self.galaxy, self.fit_info,
-                             run=self.run, n_posterior=1000,
+                             run=self.run, n_posterior=n_posterior,
                              path=path_posterior)  
         if advanced:
             # WARNING: this is memory intensive
             # The program may crash when loading too many objects in this mode
             self.fit.posterior.get_advanced_quantities()
+
         if distance > 0:
             self._correct_distance(distance)
             self.distance = distance
         else:
             self.distance = pipes.utils.cosmo.luminosity_distance(redshift).value
+
+        if save_memory:
+            self.age_bins = self.fit_info['continuity']['bin_edges']
+            self.sfh = self.Leja19_SFH(plot=False)
+            # SFH samples consume a lot of memory, delete them
+            del self.fit.posterior.samples["sfh"]
+            del self.fit.posterior.samples2d
 
     def _get_sample_percentiles(self, param, perc=(16, 50, 84)):
         '''

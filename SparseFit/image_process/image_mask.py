@@ -27,7 +27,7 @@ def mask_separate(mask_ref, img_ref, coord, deblend=False):
     center_label = mask_label[center_pix[1]][center_pix[0]]
     
     mask_center  = mask_label == center_label
-    mask_outer   = mask_label & (mask_label != center_label)
+    mask_outer   = (mask_label > 0) & (mask_label != center_label)
 
     return mask_center, mask_outer
 

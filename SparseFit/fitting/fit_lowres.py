@@ -60,7 +60,7 @@ def predict_flux_table(highres_flux_path, filters, seds=None,
         if seds is not None:
             sed = seds[j]
         else:
-            sed = BSEDresults(galaxy, ID=j, run=run, 
+            sed = BSEDresults(galaxy, ID=j, run=run, advanced=True,
                               flux_table=highres_flux_path, manual_prior=manual_prior,
                               path_posterior=path_posterior)
 

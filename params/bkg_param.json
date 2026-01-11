@@ -519,7 +519,7 @@
     "NGC3368": {
         "GALEX": {
             "box_size": 3500,
-            "mask_thresh": 10,
+            "mask_thresh": 3,
             "npixels": 100
         },
         "SDSS": {
@@ -666,19 +666,19 @@
     },
     "NGC3556": {
         "GALEX": {
-            "box_size": 3500,
-            "mask_thresh": 10,
+            "box_size": 1500,
+            "mask_thresh": 3,
             "npixels": 100
         },
         "SDSS": {
-            "box_size": 400,
+            "box_size": 2000,
             "mask_thresh": 3,
             "npixels": 100
         },
         "2MASS": {
             "box_size": 100,
-            "mask_thresh": 5,
-            "npixels": 100
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "WISE": {
             "box_size": 300,
@@ -691,8 +691,8 @@
             "npixels": 100
         },
         "MIPS": {
-            "box_size": 15,
-            "mask_thresh": 5,
+            "box_size": 50,
+            "mask_thresh": 3,
             "npixels": 100
         }
     },
@@ -1832,7 +1832,7 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 300,
+            "box_size": 600,
             "mask_thresh": 1,
             "npixels": 100
         }
@@ -1915,9 +1915,9 @@
     },
     "NGC7331": {
         "GALEX": {
-            "box_size": 50,
+            "box_size": 200,
             "mask_thresh": 3,
-            "npixels": 100
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 500,
@@ -1925,7 +1925,7 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 200,
+            "box_size": 500,
             "mask_thresh": 5,
             "npixels": 10
         },
@@ -1940,14 +1940,19 @@
             "npixels": 10
         },
         "MIPS": {
-            "box_size": 50,
+            "box_size": 100,
             "mask_thresh": 3,
             "npixels": 10
         },
         "Herschel": {
-            "box_size": 20,
+            "box_size": 100,
             "mask_thresh": 2,
             "npixels": 10
+        },
+        "ha": {
+            "box_size": 100,
+            "mask_thresh": 3,
+            "npixels": 100
         }
     },
     "SexB": {

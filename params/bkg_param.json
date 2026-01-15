@@ -85,8 +85,8 @@
             "npixels": 100
         },
         "2MASS": {
-            "box_size": 500,
-            "mask_thresh": 3,
+            "box_size": 100,
+            "mask_thresh": 2,
             "npixels": 100
         },
         "WISE": {
@@ -1723,9 +1723,9 @@
     },
     "NGC5248": {
         "GALEX": {
-            "box_size": 500,
-            "mask_thresh": 10,
-            "npixels": 10
+            "box_size": 250,
+            "mask_thresh": 3,
+            "npixels": 100
         },
         "SDSS": {
             "box_size": 500,

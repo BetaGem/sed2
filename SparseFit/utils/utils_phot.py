@@ -7,7 +7,7 @@ from ..path import PATH
 from .utils_filter import *
 from .utils_file import *
 
-__all__ = ["get_pixel_size", "get_ebv", "k_extinction", "bin_noise", 
+__all__ = ["get_pixel_size", "get_ebv", "R_extinction", "bin_noise", 
            "get_a_b_ellipse", "save_flux"]
 
 def get_pixel_size(img_path):
@@ -41,7 +41,7 @@ def get_ebv(ra=0, dec=0, coord=None):
     return table['ext SFD ref'][0]
 
 
-def k_extinction(lamb_Ang, Rv=3.1):
+def R_extinction(lamb_Ang, Rv=3.1):
     '''
     Gordon23 Milky Way R(V) dependent extinction model. 
     ref: 2023ApJ...950..86G
@@ -56,7 +56,7 @@ def k_extinction(lamb_Ang, Rv=3.1):
     Returns
     -------
     float
-        k(lambda) value at the specified wavelength.
+        R(lambda) value at the specified wavelength.
     '''
     import astropy.units as u
     from dust_extinction.parameter_averages import G23

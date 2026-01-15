@@ -80,7 +80,8 @@ def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
         gal_region[segm > 0] = 1
 
     # post-processing
-    gal_region = binary_dilation(gal_region, iterations=dilate_iter)
+    gal_region = binary_dilation(gal_region, iterations=dilate_iter, 
+                                 structure=np.array([[0,1,0],[1,1,1],[0,1,0]]))
     gal_region = binary_fill_holes(gal_region).astype(np.int8)
 
     # plot the results
@@ -151,7 +152,7 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
         Ebv = get_ebv(coord=coord)
 
     wave_piv = np.array([get_filter_waves(f)[1] for f in filters])
-    A_lambda = np.array([k_extinction(wave) for wave in wave_piv]) * Ebv
+    A_lambda = np.array([R_extinction(wave) for wave in wave_piv]) * Ebv
     A_factor = 10**(0.4 * A_lambda)
 
     # load reference band

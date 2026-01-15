@@ -54,15 +54,15 @@ def get_neighboring_pixels(arr, dilate_pix):
 
 
 def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_limit=4.0, 
-                  r_growth=1, dr_growth=1, grow_percentile=50, out_SNR_factor=1.0,
+                  r_growth=1, dr_growth=1, grow_percentile=50, out_SNR_factor=1.0, dilate_npixels=100,
                   connected=True, out_path=None, verbose=False):
     """
     A modified function for pixel binning based on piXedfit.piXedfit_bin (Abdurro'uf et al. 2021)
 
     [https://github.com/aabdurrouf/piXedfit]
 
-    :param fits_fluxmap: hdulist, str
-        Input FITS file or path containing the photometric data cube. The photometric data cube should include 3 hdus:
+    :param fits_fluxmap: str
+        Path of the photometric data cube. The photometric data cube should include 3 hdus:
         No. Name           Type       Shape            Note
          0  FLUX           PrimaryHDU (n_band,l,l)  Flux map in each band
          1  FLUX_ERR       ImageHDU   (n_band,l,l)  Uncertainty map in each band
@@ -87,6 +87,9 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     out_SNR_factor : int
         The S/N thresholds for the last bin are multiplied by this factor.
 
+    dilate_npixels : int
+        Minimum number of pixels for a bin to be dilated.
+
     grow_percentile : float, 0 < grow_percentile < 100
         In each iteration of bin growth, only pixels with flux in the ref_band higher than this percentile will be included.
 
@@ -105,11 +108,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
         return out_path
 
     # load data
-    if isinstance(fits_fluxmap, str):
-        hdu = fits.open(fits_fluxmap)
-    else:
-        hdu = fits_fluxmap.copy()
-
+    hdu = fits.open(fits_fluxmap)
     header = hdu[0].header
     gal_region   = hdu['GALAXY_REGION'].data
     map_flux     = hdu['FLUX'].data
@@ -124,7 +123,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
 
     # modify negative fluxes in a given band with the minimum flux in that band
     # this is only used in calculating chi-square for the evaluation of the SED shape similarity
-    map_flux_corr = map_flux
+    map_flux_corr = map_flux.copy()
     for i in range(n_band):
         rows, cols = np.where((map_flux[i] > 0) & (gal_region == 1))
         if len(rows) > 0:
@@ -313,8 +312,6 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                     # get bin
                     count_bin = count_bin + 1
                     pixbin_map[cumul_rows, cumul_cols] = count_bin
-                    map_bin_flux[cumul_rows, cumul_cols] = tot_bin_flux
-                    map_bin_flux_err[cumul_rows, cumul_cols] = np.sqrt(tot_bin_flux_err2)
                     cumul_npixs_in_bin = cumul_npixs_in_bin + len(cumul_rows)
 
                     stat_increase = 0
@@ -323,7 +320,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                 else:
                     # check remaining pixels
                     rows_rest, cols_rest = np.where((gal_region==1) & (pixbin_map==0))
-                    tflux = np.sum(map_flux_trans[rows_rest,cols_rest], axis=0)
+                    tflux = np.sum(map_flux_trans[rows_rest, cols_rest], axis=0)
                     tflux_err2 = np.sum(np.square(map_flux_err_trans[rows_rest, cols_rest]), axis=0)
                     tSNR = np.nan_to_num(tflux / np.sqrt(tflux_err2))
                     tidx = np.where(tSNR >= SN_threshold * out_SNR_factor)
@@ -333,8 +330,6 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                         # bin all remaining pixels:
                         count_bin = count_bin + 1
                         pixbin_map[rows_rest, cols_rest] = count_bin
-                        map_bin_flux[rows_rest, cols_rest] = tflux
-                        map_bin_flux_err[rows_rest, cols_rest] = np.sqrt(tflux_err2)
                         cumul_npixs_in_bin = cumul_npixs_in_bin + len(rows_rest)
 
                         stat_increase = 0
@@ -346,8 +341,6 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                         # get bin
                         count_bin = count_bin + 1
                         pixbin_map[cumul_rows, cumul_cols] = count_bin
-                        map_bin_flux[cumul_rows, cumul_cols] = tot_bin_flux
-                        map_bin_flux_err[cumul_rows, cumul_cols] = np.sqrt(tot_bin_flux_err2)
                         cumul_npixs_in_bin = cumul_npixs_in_bin + len(cumul_rows)
 
                         stat_increase = 0
@@ -383,7 +376,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     for i in range(1, count_bin + 1):
 
         this_bin_map = pixbin_map == i
-        if np.sum(this_bin_map) < 100:
+        if np.sum(this_bin_map) < dilate_npixels:
             continue
         this_bin_map = binary_dilation(this_bin_map,
                             structure=np.array([[0,1,0],[1,1,1],[0,1,0]]))
@@ -396,6 +389,14 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
         
     count_bin = int(np.max(pixbin_map_clean))
     pixbin_map = pixbin_map_clean
+
+    # calculate bin flux and flux error maps
+    for i in range(1, np.max(pixbin_map) + 1):
+        rows, cols = np.where(pixbin_map == i)
+        tot_bin_flux = np.sum(map_flux_trans[rows, cols], axis=0)
+        tot_bin_flux_err2 = np.sum(np.square(map_flux_err_trans[rows, cols]), axis=0)
+        map_bin_flux[rows, cols] = tot_bin_flux
+        map_bin_flux_err[rows, cols] = np.sqrt(tot_bin_flux_err2)
 
     # transpose from (y,x,wave) => (wave,y,x)
     map_bin_flux_trans = np.transpose(map_bin_flux, axes=(2,0,1))
@@ -535,9 +536,9 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
         bin_id = i + 1
         r, c = np.where(binmap == bin_id)
         # [W1 - W2] color
-        w1_flux = fluxmap[mir[0], r[0], c[0]] * unit_flux
-        w2_flux = fluxmap[mir[1], r[0], c[0]] * unit_flux
-        w12 = -2.5 * np.log10(w1_flux*33526**2 / (w2_flux*46028**2)) + 3.339 - 2.699 # AB to vega
+        # w1_flux = fluxmap[mir[0], r[0], c[0]] * unit_flux
+        # w2_flux = fluxmap[mir[1], r[0], c[0]] * unit_flux
+        # w12 = -2.5 * np.log10(w1_flux*33526**2 / (w2_flux*46028**2)) + 3.339 - 2.699 # AB to vega
 
         # apply wise color corrections
         # for n, l in enumerate(mir[:4]):

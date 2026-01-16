@@ -2,6 +2,7 @@ import numpy as np
 from math import sqrt
 from astropy.io import fits
 from astropy.table import Table
+from multiprocess import Pool
 
 from ..utils import *
 from .load_sed import BSEDresults
@@ -12,9 +13,41 @@ __all__ = ["predict_flux_table", "convolve_flux_map",
            "predict_flux_map", "new_flux_table"]
 
 
+def _process_bin(args):
+    '''
+    Helper function to process a single bin for multiprocessing.
+    '''
+    j, filters, highres_filters, highres_tab, highres_err, galaxy, run, \
+        highres_flux_path, manual_prior, path_posterior, e_cali, seds = args
+    
+    pred_flux_j = np.full(len(filters), np.nan)
+    pred_flux_err_j = np.full(len(filters), np.nan)
+    
+    # Load SED for the current bin
+    if seds is not None:
+        sed = seds[j]
+    else:
+        sed = BSEDresults(galaxy, ID=j, run=run, advanced=True,
+                          flux_table=highres_flux_path, manual_prior=manual_prior,
+                          path_posterior=path_posterior)
+    
+    for i, f in enumerate(filters):
+        if f in highres_filters:
+            pred_flux_j[i] = highres_tab[f][j]
+            pred_flux_err_j[i] = highres_err[f][j]
+        else:
+            pred_phot = sed.predict_flux(f)
+            pred_flux_j[i] = pred_phot[1]
+            pred_flux_err_j[i] = sqrt((pred_phot[2] - pred_phot[0])**2 / 4 + (e_cali[i] * pred_flux_j[i])**2)
+    
+    # 
+    del sed
+    return j, pred_flux_j, pred_flux_err_j
+
+
 def predict_flux_table(highres_flux_path, filters, seds=None,
                        run='_highres', galaxy=None, path_posterior='', manual_prior=None,
-                       out_path=None, prefix='pred_', overwrite=True):
+                       out_path=None, prefix='pred_', overwrite=True, n_processes=4):
     '''
     Create flux table involving all filters. 
     The fluxes of low-resolution filters are predicted using
@@ -40,6 +73,8 @@ def predict_flux_table(highres_flux_path, filters, seds=None,
         Prefix for the output file name.
     overwrite : bool, optional
         Overwrite existing files.
+    n_processes : int, optional
+        Number of processes to use. Defaults to 4.
     '''
     # initialize
     highres_tab = Table.read(highres_flux_path)
@@ -52,29 +87,23 @@ def predict_flux_table(highres_flux_path, filters, seds=None,
 
     pred_flux = np.full((n_bin, len(filters)), np.nan)
     pred_flux_err = np.full((n_bin, len(filters)), np.nan)
-
-    # create predicted flux table
-    for j in range(n_bin):
-
-        # Load SED for the current bin
-        if seds is not None:
-            sed = seds[j]
-        else:
-            sed = BSEDresults(galaxy, ID=j, run=run, advanced=True,
-                              flux_table=highres_flux_path, manual_prior=manual_prior,
-                              path_posterior=path_posterior)
-
-        for i, f in enumerate(filters):
-            if f in highres_filters:
-                pred_flux[j, i] = highres_tab[f][j]
-                pred_flux_err[j, i] = highres_err[f][j]
-            else:
-                pred_phot = sed.predict_flux(f)
-                pred_flux[j, i] = pred_phot[1]
-                pred_flux_err[j, i] = sqrt((pred_phot[2] - pred_phot[0])**2 / 4 + (e_cali[i] * pred_flux[j, i])**2)
-
-        # clean up memory
-        del sed
+    
+    # Prepare arguments for multiprocessing
+    args_list = [
+        (j, filters, highres_filters, highres_tab, highres_err, galaxy, run,
+         highres_flux_path, manual_prior, path_posterior, e_cali, seds)
+        for j in range(n_bin)
+    ]
+    
+    # Process bins in parallel
+    print(f"Processing {n_bin} bins using {n_processes} processes...")
+    with Pool(processes=n_processes) as pool:
+        results = pool.map(_process_bin, args_list)
+    
+    # Collect results
+    for j, pred_flux_j, pred_flux_err_j in results:
+        pred_flux[j, :] = pred_flux_j
+        pred_flux_err[j, :] = pred_flux_err_j
 
     save_flux(pred_flux, pred_flux_err, filters, 
               out_path=out_path, prefix=prefix, overwrite=overwrite)
@@ -239,9 +268,9 @@ def new_flux_table(fluxmap_lowres, pixbin_map, pred_flux_path,
         np.savez(save_pred_path + "pred_map.npz", **pred_map)
 
     pixbin_hdul = fits.open(pixbin_map)
-    binmap = pixbin_hdul[0].data.astype(int)
+    binmap  = pixbin_hdul[0].data.astype(int)
     bin_ids = binmap.ravel()
-    n_bin = binmap.max()
+    n_bin   = binmap.max()
 
     fluxmap = fits.open(fluxmap_lowres)
     flux_unit = fluxmap[0].header['UNIT']
@@ -259,20 +288,13 @@ def new_flux_table(fluxmap_lowres, pixbin_map, pred_flux_path,
             map_obs = fluxmap[0].data[i+1] * flux_unit
             map_obs[~np.isfinite(map_obs)] = 0
 
-            # e_obs = fluxmap[1].data[i+1] * flux_unit
             pred_map_upd[f] = deepcopy(pred_map[f])
 
-            # observed flux and error
+            # observed and predicted flux
             flux_obs = np.bincount(bin_ids, 
                                    weights=map_obs.ravel())
-            # e_flux_obs = np.sqrt(np.bincount(bin_ids, 
-            #                                  weights=(e_obs**2).ravel()))
-
-            # convolved predicted flux and error
             flux_conv = np.bincount(bin_ids, 
                                     weights=pred_map_conv[f][0].ravel())
-            # e_flux_conv = np.sqrt(np.bincount(bin_ids, 
-            #                                   weights=(pred_map_conv[f][1]**2).ravel()))
 
             # scaling factor (0th = background outside RoI)
             scale = np.ones(n_bin + 1)
@@ -285,7 +307,6 @@ def new_flux_table(fluxmap_lowres, pixbin_map, pred_flux_path,
             target_bins = np.where(bright)[0] if n % 2 else np.where(~bright)[0]
 
             # update predictions for each bin (vectorized mask)
-            # for j in range(n_bin):
             for j in target_bins:
 
                 bin_mask = (binmap == j + 1)

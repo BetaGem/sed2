@@ -102,7 +102,7 @@
     "NGC2841": {
         "filter": "GALEX_FUV",
         "nsigma": 1.5,
-        "size": 151,
+        "size": 201,
         "mask": [
             3,
             2,

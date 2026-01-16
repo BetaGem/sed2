@@ -311,7 +311,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 100,
+            "box_size": 200,
             "mask_thresh": 3,
             "npixels": 100
         },

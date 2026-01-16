@@ -121,17 +121,6 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     map_flux_trans     = np.transpose(map_flux,     axes=(1,2,0))
     map_flux_err_trans = np.transpose(map_flux_err, axes=(1,2,0))
 
-    # modify negative fluxes in a given band with the minimum flux in that band
-    # this is only used in calculating chi-square for the evaluation of the SED shape similarity
-    map_flux_corr = map_flux.copy()
-    for i in range(n_band):
-        rows, cols = np.where((map_flux[i] > 0) & (gal_region == 1))
-        if len(rows) > 0:
-            lowest = np.min(map_flux[i][rows, cols])
-
-            rows, cols = np.where((map_flux[i] < 0) & (gal_region == 1))
-            map_flux_corr[i][rows, cols] = lowest
-
     # find systematic error factor
     # (assume that SED shapes are always similar for the 9 central pixels)
     rows, cols = np.where(gal_region == 1)
@@ -161,9 +150,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
 
     # apply the factor
     map_flux_err_corr = np.sqrt( map_flux_err**2 + (factor * map_flux)**2 )
-
     # transpose from (band,y,x) -> (y,x,band)
-    map_flux_corr_trans = np.transpose(map_flux_corr, axes=(1,2,0))
     map_flux_err_corr_trans = np.transpose(map_flux_err_corr, axes=(1,2,0))
 
     # get reference band for pixel brightness
@@ -266,7 +253,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                 rows1, cols1 = np.where(neighbor_pix & (gal_region==1) & (pixbin_map==0))
 
                 # select the bright half of these pixels (bright & within RoI & not occupied by other bins)
-                pix_select = (map_flux_corr[ref_band] > np.nanpercentile(map_flux_corr[ref_band][rows1, cols1], grow_percentile)) &\
+                pix_select = (map_flux[ref_band] > np.nanpercentile(map_flux[ref_band][rows1, cols1], grow_percentile)) &\
                       (gal_region==1) & (pixbin_map==0)
                 if connected:
                     rows1, cols1 = np.where(pix_select & neighbor_pix)
@@ -278,16 +265,16 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                 cent_pix_SED_flux_err = np.zeros((dim_y, dim_x, n_band))
                 norm0 = np.zeros((n_band, dim_y, dim_x))
 
-                cent_pix_SED_flux[rows1, cols1] = map_flux_corr_trans[bin_y_cent][bin_x_cent]
+                cent_pix_SED_flux[rows1, cols1] = map_flux_trans[bin_y_cent][bin_x_cent]
                 cent_pix_SED_flux_err[rows1, cols1] = map_flux_err_corr_trans[bin_y_cent][bin_x_cent]
 
-                top0 = np.nansum(map_flux_corr_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1] / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
+                top0 = np.nansum(map_flux_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1] / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
                 bottom0 = np.nansum(np.square(cent_pix_SED_flux[rows1, cols1]) / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
                 for i in range(0,n_band):
                     norm0[i][rows1, cols1] = top0 / bottom0
                 # transpose from (band,y,x) -> (y,x,band)
                 norm0_trans = np.transpose(norm0, axes=(1,2,0))
-                pix_chi2 = np.nansum(np.square(map_flux_corr_trans[rows1, cols1] - (norm0_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1])) / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
+                pix_chi2 = np.nansum(np.square(map_flux_trans[rows1, cols1] - (norm0_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1])) / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
 
                 idx_sel = np.where((pix_chi2 / n_band) <= redc_chi2_limit)
 
@@ -556,7 +543,8 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
         fluxmap[l] *= 10**(-0.4 * w_zpc[n])
 
     # mask the region of interest
-    msk = (binmap > 0) #  & (binmap != binmap.max())
+    msk = binmap > 0
+    apers = []
 
     # Calculate background sampling error
     print("Calculating background sampling error ...")
@@ -572,18 +560,22 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
 
         for j in range(1, n_bin+1):
             bin_ = binmap == j
+            aper_ = None if i == 0 else apers[j-1]
 
-            flux_err, _ = bin_noise(img, bin_mask=bin_, 
-                                    mask_src=msk, bootstrap=bootstrap)
+            flux_err, _, aper = bin_noise(
+                img, bin_mask=bin_, apers=aper_,
+                mask_src=msk, bootstrap=bootstrap)
             if flux_err == 0:
                 # increase bootstrap samples and retry
-                flux_err, _ = bin_noise(img, bin_mask=bin_, 
-                                        mask_src=msk, bootstrap=bootstrap, circle_aper=True)
+                flux_err, _, aper = bin_noise(
+                    img, bin_mask=bin_, apers=aper_,
+                    mask_src=msk, bootstrap=bootstrap*2, circle_aper=True)
             if flux_err == 0:
                 # assume Gaussian noise
                 flux_err = e_last * np.sqrt(np.sum(bin_) / np.sum(binmap == j-1))
 
             e_last = flux_err
+            if i == 0: apers.append(aper)
 
             bkg_flux_err = np.nanmax(fluxmap_err[i][bin_])
             fluxmap_err[i][bin_] = np.sqrt((flux_err*bin_unit)**2 + bkg_flux_err**2)

@@ -72,7 +72,7 @@ def R_extinction(lamb_Ang, Rv=3.1):
 
 
 
-def bin_noise(img, bin_mask, aper_src=None, mask_src=None, 
+def bin_noise(img, bin_mask, aper_src=None, mask_src=None, apers=None,
               bootstrap=100, max_overlap=0.1, circle_aper=False):
     '''
     Estimate the uncertainties by randomly sampling the blank sky.
@@ -87,6 +87,8 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None,
         The original aperture to exclude from the noise estimation.
     mask_src : 2D array, optional
         A mask to exclude certain regions from the noise estimation.
+    apers : list of EllipticalAperture, optional
+        A list to user defined apertures.
     bootstrap : int
         The number of bootstrap samples to draw.
     max_overlap : float
@@ -103,17 +105,19 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None,
     '''
     from photutils.aperture import EllipticalAperture
     
+    # random positions and angles
     np.random.seed(42)
-    xy_rand = np.random.rand(bootstrap, 2) * img.shape[0]
-    theta_rand = np.random.rand(bootstrap) * 2 * np.pi
+    xy_rd = np.random.rand(bootstrap, 2) * img.shape[0]
+    theta_rd = np.random.rand(bootstrap) * 2 * np.pi
 
     # exclude sources from noise estimation
     if aper_src is not None:
         p0 = aper_src.positions
         mask = np.zeros_like(img).astype(bool)
-        aper_p0 = aper_src.to_mask(method='center').data.astype(bool)
-        mask[int(p0[1])-aper_p0.shape[0]//2+1: int(p0[1])+1-aper_p0.shape[0]//2+aper_p0.shape[0],
-             int(p0[0])-aper_p0.shape[1]//2+1: int(p0[0])+1-aper_p0.shape[1]//2+aper_p0.shape[1]] |= aper_p0
+        ap_p0 = aper_src.to_mask(method='center').data.astype(bool)
+        x0, y0 = int(p0[0]), int(p0[1])
+        mask[y0-ap_p0.shape[0]//2+1: y0+1-ap_p0.shape[0]//2+ap_p0.shape[0],
+             x0-ap_p0.shape[1]//2+1: x0+1-ap_p0.shape[1]//2+ap_p0.shape[1]] |= ap_p0
         mask[~np.isfinite(img)] = True
     elif mask_src is None: 
         raise TypeError("When `aper_src` is None, `mask_src` must be provided!")
@@ -128,20 +132,23 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None,
         b = a
 
     # random ellisptical apertures
-    aper_all = []
-    for i, p in enumerate(xy_rand):
-        try:
-            aper_rand = EllipticalAperture(p, a, b, theta=theta_rand[i])
-            if i and mask[int(p[1]), int(p[0])]:
-                continue
-            if i and aper_rand.do_photometry(mask)[0][0] > aper_rand.area * max_overlap:
-                continue
-            aper_p = aper_rand.to_mask(method='center').data.astype(bool)
-            # aper_p[aper_p > 0.5] = True
-            mask[int(p[1])-aper_p.shape[0]//2+1:int(p[1])+1-aper_p.shape[0]//2+aper_p.shape[0],
-                 int(p[0])-aper_p.shape[1]//2+1:int(p[0])+1-aper_p.shape[1]//2+aper_p.shape[1]] |= aper_p
-            aper_all.append(aper_rand)
-        except: pass
+    if apers is not None:
+        aper_all = apers
+    else:
+        aper_all = []
+        for i, p in enumerate(xy_rd):
+            try:
+                ap_rd = EllipticalAperture(p, a, b, theta=theta_rd[i])
+                if i and mask[int(p[1]), int(p[0])]:
+                    continue
+                if i and ap_rd.do_photometry(mask)[0][0] > ap_rd.area * max_overlap:
+                    continue
+                ap_p = ap_rd.to_mask(method='center').data.astype(bool)
+                x, y = int(p[0]), int(p[1])
+                mask[y-ap_p.shape[0]//2+1:y+1-ap_p.shape[0]//2+ap_p.shape[0],
+                     x-ap_p.shape[1]//2+1:x+1-ap_p.shape[1]//2+ap_p.shape[1]] |= ap_p
+                aper_all.append(ap_rd)
+            except: pass
 
     # get the fluxes in the random apertures
     ap_fluxes = [aper.do_photometry(img)[0] for aper in aper_all]
@@ -154,9 +161,9 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None,
         aper_src_flux = np.nansum(img[mask_src])
 
     if np.sum(np.isfinite(ap_fluxes)) < 3: 
-        return 0, aper_src_flux
+        return 0, aper_src_flux, []
 
-    return np.nanstd(ap_fluxes, ddof=1), aper_src_flux
+    return np.nanstd(ap_fluxes, ddof=1), aper_src_flux, aper_all
 
 
 

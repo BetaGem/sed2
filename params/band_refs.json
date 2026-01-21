@@ -371,7 +371,7 @@
     },
     "NGC4559": {
         "filter": "GALEX_FUV",
-        "nsigma": 1.5,
+        "nsigma": 3,
         "size": 121,
         "mask": [
             3,

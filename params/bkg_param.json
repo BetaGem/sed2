@@ -16,7 +16,7 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 250,
+            "box_size": 500,
             "mask_thresh": 1.5,
             "npixels": 100
         },
@@ -1290,12 +1290,12 @@
     },
     "NGC4559": {
         "GALEX": {
-            "box_size": 150,
-            "mask_thresh": 10,
-            "npixels": 100
+            "box_size": 100,
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
-            "box_size": 500,
+            "box_size": 1000,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -1305,12 +1305,12 @@
             "npixels": 100
         },
         "WISE": {
-            "box_size": 50,
+            "box_size": 500,
             "mask_thresh": 3,
             "npixels": 10
         },
         "IRAC": {
-            "box_size": 600,
+            "box_size": 400,
             "mask_thresh": 2,
             "npixels": 10
         },
@@ -1325,9 +1325,9 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 200,
-            "mask_thresh": 3,
-            "npixels": 100
+            "box_size": 500,
+            "mask_thresh": 1.5,
+            "npixels": 1000
         }
     },
     "NGC4565": {

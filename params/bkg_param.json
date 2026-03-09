@@ -225,14 +225,39 @@
     },
     "NGC0925": {
         "GALEX": {
-            "box_size": 150,
-            "mask_thresh": 10,
+            "box_size": 200,
+            "mask_thresh": 3,
+            "npixels": 10
+        },
+        "2MASS": {
+            "box_size": 200,
+            "mask_thresh": 3,
             "npixels": 100
         },
-        "PS1": {
+        "WISE": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "IRAC": {
+            "box_size": 200,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "MIPS": {
             "box_size": 100,
             "mask_thresh": 3,
             "npixels": 100
+        },
+        "Herschel": {
+            "box_size": 200,
+            "mask_thresh": 2,
+            "npixels": 10
+        },
+        "ha": {
+            "box_size": 300,
+            "mask_thresh": 3,
+            "npixels": 10
         }
     },
     "NGC1055": {

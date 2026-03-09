@@ -74,12 +74,12 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
         dust["umin"]  = (0.1, 25.0)
         dust["gamma"] = (1e-4, 0.5)
 
-    dust["type"] = "CF00"
-    dust["Av"] = (0., 4.)
-    dust["n"] = (0.3, 1.5)
-    dust["n_prior"] = "Gaussian"
-    dust["n_prior_mu"] = 0.7
-    dust["n_prior_sigma"] = 0.3
+    # dust["type"] = "CF00"
+    # dust["Av"] = (0., 4.)
+    # dust["n"] = (0.3, 1.5)
+    # dust["n_prior"] = "Gaussian"
+    # dust["n_prior_mu"] = 0.7
+    # dust["n_prior_sigma"] = 0.3
     dust["eta"] = (1., 4.)
     dust["eta_prior"] = "Gaussian"
     if dust_ratio is not None:
@@ -87,6 +87,15 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     else:
         dust["eta_prior_mu"] = 1 / 0.44
     dust["eta_prior_sigma"] = 0.3
+
+    dust["type"] = "Salim"
+    dust["Av"] = (0., 5.)
+    dust['delta'] = (-1.2, 0.4)
+    dust["delta_prior"] = "Gaussian"
+    dust["delta_prior_mu"] = 0.7
+    dust["delta_prior_sigma"] = 0.3
+    dust["B"] = (0, 5)
+
     fit_instructions["dust"] = dust
     
     if nebular_emission:

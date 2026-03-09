@@ -164,7 +164,7 @@ def center_stars(name, hdu, seg_center, year_to_gaia=-12, coord=None):
         _r = 50 if name in ['NGC2903', 'NGC4214', 'NGC4449', 'NGC5194'] else 10
         if np.sqrt( (x-WCS(hdu.header).pixel_shape[1]/2)**2 + (y-WCS(hdu.header).pixel_shape[0]/2)**2) < _r:
             continue
-        if stars['phot_rp_mean_mag'][i] > 20 and stars['phot_bp_mean_mag'][i] > 20: # skip faint stars
+        if stars['phot_rp_mean_mag'][i] > 18 and stars['phot_bp_mean_mag'][i] > 18: # skip faint stars
             continue
         cstars_index.append(i)
 

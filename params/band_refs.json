@@ -71,7 +71,7 @@
     },
     "NGC0925": {
         "filter": "GALEX_NUV",
-        "nsigma": 1.5,
+        "nsigma": 2,
         "size": 101,
         "mask":[
             3,

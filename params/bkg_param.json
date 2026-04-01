@@ -214,13 +214,38 @@
     "NGC0891": {
         "GALEX": {
             "box_size": 100,
-            "mask_thresh": 10,
-            "npixels": 100
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "PS1": {
             "box_size": 100,
             "mask_thresh": 3,
             "npixels": 100
+        },
+        "2MASS": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "WISE": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "IRAC": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "MIPS": {
+            "box_size": 500,
+            "mask_thresh": 3,
+            "npixels": 100
+        },
+        "Herschel": {
+            "box_size": 200,
+            "mask_thresh": 2,
+            "npixels": 10
         }
     },
     "NGC0925": {
@@ -273,11 +298,11 @@
         },
         "2MASS": {
             "box_size": 200,
-            "mask_thresh": 3,
+            "mask_thresh": 2,
             "npixels": 100
         },
         "WISE": {
-            "box_size": 75,
+            "box_size": 200,
             "mask_thresh": 3,
             "npixels": 100
         },
@@ -1131,8 +1156,8 @@
     "NGC4496A": {
         "GALEX": {
             "box_size": 150,
-            "mask_thresh": 10,
-            "npixels": 100
+            "mask_thresh": 3,
+            "npixels": 10
         },
         "SDSS": {
             "box_size": 300,

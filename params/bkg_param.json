@@ -111,7 +111,7 @@
         },
         "ha": {
             "box_size": 50,
-            "mask_thresh": 1.5,
+            "mask_thresh": 1,
             "npixels": 5
         }
     },

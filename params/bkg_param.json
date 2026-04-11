@@ -936,8 +936,8 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 50,
-            "mask_thresh": 3,
+            "box_size": 100,
+            "mask_thresh": 1,
             "npixels": 10
         }
     },

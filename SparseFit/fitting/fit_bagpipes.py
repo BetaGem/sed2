@@ -33,15 +33,9 @@ def load_phot(ID):
     # turn this into a 2D array
     photometry = np.array([f_lamb, f_lamb_err]).T
 
-    # Enforce a maximum SNR
+    # add a constant model uncertainty of 5%
     for i in range(len(photometry)):
-        
-        max_snr = 20
-        if ID == 9999 and 'mips' in filters[i]: 
-            max_snr = 10
-
-        if photometry[i, 0] / photometry[i, 1] > max_snr:
-            photometry[i, 1] = photometry[i, 0] / max_snr
+        photometry[i, 1] = np.sqrt( photometry[i, 1]**2 + (0.05 * photometry[i, 0])**2 )
 
     return photometry
 
@@ -74,12 +68,12 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
         dust["umin"]  = (0.1, 25.0)
         dust["gamma"] = (1e-4, 0.5)
 
-    # dust["type"] = "CF00"
-    # dust["Av"] = (0., 4.)
-    # dust["n"] = (0., 1.5)
-    # dust["n_prior"] = "Gaussian"
-    # dust["n_prior_mu"] = 0.7
-    # dust["n_prior_sigma"] = 0.3
+    dust["type"] = "CF00"
+    dust["Av"] = (0., 4.)
+    dust["n"] = (0., 1.5)
+    dust["n_prior"] = "Gaussian"
+    dust["n_prior_mu"] = 0.7
+    dust["n_prior_sigma"] = 0.3
     dust["eta"] = (1., 4.)
     dust["eta_prior"] = "Gaussian"
     if dust_ratio is not None:
@@ -88,10 +82,10 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
         dust["eta_prior_mu"] = 1 / 0.44
     dust["eta_prior_sigma"] = 0.3
 
-    dust["type"] = "Salim"
-    dust["Av"] = (0., 4.)
-    dust['delta'] = (-1.2, 0.4)
-    dust["B"] = (0, 1)
+    # dust["type"] = "Salim"
+    # dust["Av"] = (0., 4.)
+    # dust['delta'] = (-1.2, 0.4)
+    # dust["B"] = (0, 1)
 
     fit_instructions["dust"] = dust
     

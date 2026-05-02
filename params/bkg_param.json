@@ -709,8 +709,8 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 500,
-            "mask_thresh": 3,
+            "box_size": 250,
+            "mask_thresh": 1,
             "npixels": 100
         }
     },
@@ -857,8 +857,8 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 100,
-            "mask_thresh": 1.5,
+            "box_size": 500,
+            "mask_thresh": 1.2,
             "npixels": 100
         }
     },
@@ -1766,7 +1766,7 @@
             "npixels": 10
         },
         "ha": {
-            "box_size": 500,
+            "box_size": 150,
             "mask_thresh": 1,
             "npixels": 10
         }

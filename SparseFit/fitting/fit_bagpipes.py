@@ -3,7 +3,7 @@ import bagpipes as pipes
 from astropy.table import Table
 
 from ..path import PATH
-from ..utils import *
+from ..utils import file_name
 
 __all__ = ["load_phot", "load_filters", "fit_info", 
            "build_all", "run"]

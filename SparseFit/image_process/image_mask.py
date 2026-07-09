@@ -1,13 +1,17 @@
 import os
+import numpy as np
+from astropy.io import fits
+from astropy.wcs import WCS
 import astropy.units as u
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
+from photutils.background import Background2D
+from photutils.segmentation import detect_threshold, detect_sources
+from scipy import ndimage
 from photutils.segmentation import deblend_sources
 
-from .image_bkg import *
 
-
-PATH = "/home/pku/Astro/FEASTS_SED/data"
+path_sed = "/home/pku/Astro/FEASTS_SED/data"
 
 def mask_separate(mask_ref, img_ref, coord, deblend=False):
 
@@ -46,7 +50,7 @@ def get_sweep_photoz(ralo, rahi, declo, dechi):
     file_path  = "/home/pku/Astro/FEASTS_SED/data/ancillary/"
     print("sweep file:", sweep_name)
     
-    if not sweep_name in os.listdir(file_path):
+    if sweep_name not in os.listdir(file_path):
         print("target sweep file not found, downloading ......")
         sn = "north" if dechi > 32 else "south"
         url = f"https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/{sn}/sweep/9.1-photo-z/" + sweep_name
@@ -73,7 +77,7 @@ def get_tractor_catalog(ralo, rahi, declo, dechi):
     desi_cat = []
     for brick in bricks:
         brick_name = f"tractor-{brick}.fits"
-        if not brick_name in os.listdir(file_path):
+        if brick_name not in os.listdir(file_path):
             sn = "north" if dechi > 32 else "south"
             url = f"https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/{sn}/tractor/{brick[:3]}/{brick_name}"
             os.system(f"wget -O {file_path}{brick_name} {url}")
@@ -125,13 +129,14 @@ def center_stars(name, hdu, seg_center, year_to_gaia=-12, coord=None):
     gaia stars within inner mask
     '''
 
-    if coord is None: coord = SkyCoord.from_name(name)
+    if coord is None: 
+        coord = SkyCoord.from_name(name)
     gal_ra, gal_dec = coord.ra.value, coord.dec.value
 
     file_path = "/home/pku/Astro/FEASTS_SED/data/ancillary/"
     gaia_cat  = f'Gaia3_star_{name}.vot'
     
-    if not gaia_cat in os.listdir(file_path):
+    if gaia_cat not in os.listdir(file_path):
         print("downloading", gaia_cat)
         gaia_download(gal_ra, gal_dec, 
                       width=0.5 / np.cos(gal_dec/57.3), height=0.5,
@@ -222,10 +227,12 @@ def get_catalogs(name, ref_hdu, seg_center, gal_z=0, coord=None, year_to_gaia=-1
     declo = ref_wcs.pixel_to_world_values(0, np.min(center_pix[1]))[1]
     dechi = ref_wcs.pixel_to_world_values(0, np.max(center_pix[1]))[1]
     # outliers
-    if name == 'NGC3521': declo = 0
+    if name == 'NGC3521': 
+        declo = 0
 
     # source detection within the central region
-    if coord is None: coord = SkyCoord.from_name(name)
+    if coord is None: 
+        coord = SkyCoord.from_name(name)
     cstars = center_stars(name, ref_hdu, seg_center, year_to_gaia=year_to_gaia, coord=coord)
 
     if name in ['NGC7331', 'SexB']:
@@ -248,7 +255,7 @@ def mask_one_band_inner(name, sci_file, cstars, csources,
     '''
     generate inner mask for the current band.
     '''
-    cur_img = f'{PATH}/{name}/cropped/crop_{sci_file}'
+    cur_img = f'{path_sed}/{name}/cropped/crop_{sci_file}'
     cur_hdu = fits.open(cur_img)
     cur_wcs = WCS(cur_hdu[0].header)
     
@@ -278,11 +285,12 @@ def mask_one_band_inner(name, sci_file, cstars, csources,
         crop_radius = int(size * fwhm)
         crop = cur_hdu[0].data[cy - crop_radius: cy + crop_radius + 1,
                                cx - crop_radius: cx + crop_radius + 1]
-        if not "wise" in cur_img:         # wise images are already smoothed enough ......
+        if "wise" not in cur_img:         # wise images are already smoothed enough ......
             crop = ndimage.gaussian_filter(crop, fwhm / 2.235)
         try:
             crop_bkg = Background2D(crop, box_size=crop_radius*2, exclude_percentile=99)
-        except: continue
+        except ValueError: 
+            continue
         back_median, back_std = crop_bkg.background_median, crop_bkg.background_rms_median
         
         if cur_hdu[0].data[cy, cx] < back_median + back_std * thresh:
@@ -303,9 +311,9 @@ def mask_one_band_inner(name, sci_file, cstars, csources,
 
 def mask_one_band_outer(name, sci_file, center_mask, nsigma=3, fwhm=1, dilate=0, deblend=False, clean=True):
 
-    cur_img = f'{PATH}/{name}/cropped/crop_{sci_file}'
+    cur_img = f'{path_sed}/{name}/cropped/crop_{sci_file}'
     cur_hdu = fits.open(cur_img)
-    cur_wcs = WCS(cur_hdu[0].header)
+    # cur_wcs = WCS(cur_hdu[0].header)
 
     # mask center
     center_mask = center_mask > 0
@@ -343,7 +351,7 @@ def mask_one_band_outer(name, sci_file, center_mask, nsigma=3, fwhm=1, dilate=0,
 def load_circ_mask(gname, fname):
     '''load interactive circular masks from file'''
     try:
-        circ_mask = np.load(f"{PATH}/{gname}/masked/circ_mask_{gname}_{fname}.npy").astype(bool)
+        circ_mask = np.load(f"{path_sed}/{gname}/masked/circ_mask_{gname}_{fname}.npy").astype(bool)
         return circ_mask
     except FileNotFoundError:
         return False

@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.stats import sigma_clipped_stats, SigmaClip
-from photutils.segmentation import detect_sources, detect_threshold, deblend_sources
-from photutils.background import SExtractorBackground, Background2D, MeanBackground, MedianBackground
+from photutils.segmentation import detect_sources, detect_threshold
+from photutils.background import SExtractorBackground, Background2D, MeanBackground
 from scipy.optimize import curve_fit
 from scipy import ndimage
 
@@ -99,7 +99,6 @@ def reference_mask(path, fits_image, name_out_mask=None,
     generate mask for the reference band
     '''
     hdu = fits.open(path + fits_image)[0]
-    wcs = WCS(hdu.header)
     data = hdu.data.copy()
     if smooth:
         data = ndimage.gaussian_filter(data, smooth)

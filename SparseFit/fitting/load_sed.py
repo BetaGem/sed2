@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import bagpipes as pipes
 
-from ..path import PATH
-from ..utils.utils_filter import *
+from ..utils.utils_filter import get_filter_trans_curve
 from . import fit_bagpipes
 
 __all__ = ["BSEDresults"]
@@ -102,7 +101,7 @@ class BSEDresults(object):
 
         try:
             wav = self.fit.posterior.model_galaxy.wavelengths * (1. + _z)
-        except:
+        except (KeyError, AttributeError):
             self.fit.posterior.get_advanced_quantities()
             wav = self.fit.posterior.model_galaxy.wavelengths * (1. + _z)
 

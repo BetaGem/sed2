@@ -1,14 +1,19 @@
-import numpy as np
+import numpy as np  # noqa: EXE002
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord
 
-from ..path import PATH
-from .utils_filter import *
 from .utils_file import *
+from .utils_filter import *
 
-__all__ = ["get_pixel_size", "get_ebv", "R_extinction", "bin_noise", 
-           "get_a_b_ellipse", "save_flux"]
+__all__ = [
+    "R_extinction",
+    "bin_noise",
+    "get_a_b_ellipse",
+    "get_ebv",
+    "get_pixel_size",
+    "save_flux",
+]
 
 def get_pixel_size(img_path):
     '''

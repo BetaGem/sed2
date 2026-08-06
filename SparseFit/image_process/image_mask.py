@@ -1,17 +1,17 @@
 import os
-import numpy as np
-from astropy.io import fits
-from astropy.wcs import WCS
-import astropy.units as u
-from astropy.table import Table
-from astropy.coordinates import SkyCoord
-from photutils.background import Background2D
-from photutils.segmentation import detect_threshold, detect_sources
-from scipy import ndimage
-from photutils.segmentation import deblend_sources
 
+import astropy.units as u
+import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.table import Table
+from astropy.wcs import WCS
+from photutils.background import Background2D
+from photutils.segmentation import deblend_sources, detect_sources, detect_threshold
+from scipy import ndimage
 
 path_sed = "/home/pku/Astro/FEASTS_SED/data"
+file_path  = "/home/pku/Astro/FEASTS_SED/data/ancillary/"
 
 def mask_separate(mask_ref, img_ref, coord, deblend=False):
 
@@ -36,7 +36,7 @@ def mask_separate(mask_ref, img_ref, coord, deblend=False):
     return mask_center, mask_outer
 
 
-def get_sweep_photoz(ralo, rahi, declo, dechi):
+def get_sweep_photoz(ralo, rahi, declo, dechi, out_path='.'):
     
     # find relevant sweep files
     rastep = 10
@@ -47,42 +47,40 @@ def get_sweep_photoz(ralo, rahi, declo, dechi):
     d2 = decstep * np.ceil (dechi / decstep).astype(int)
 
     sweep_name = f"sweep-{r1:03d}p{d1:03d}-{r2:03d}p{d2:03d}-pz.fits"
-    file_path  = "/home/pku/Astro/FEASTS_SED/data/ancillary/"
     print("sweep file:", sweep_name)
     
-    if sweep_name not in os.listdir(file_path):
+    if sweep_name not in os.listdir(out_path):
         print("target sweep file not found, downloading ......")
         sn = "north" if dechi > 32 else "south"
         url = f"https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/{sn}/sweep/9.1-photo-z/" + sweep_name
-        os.system(f"wget -O {file_path}{sweep_name} {url}")
+        os.system(f"wget -c {out_path}{sweep_name} {url}")
 
-    photoz = Table.read(file_path + sweep_name)
+    photoz = Table.read(out_path + sweep_name)
     return photoz
 
 
-def get_tractor_catalog(ralo, rahi, declo, dechi):
+def get_tractor_catalog(ralo, rahi, declo, dechi, out_path='.'):
 
     from astropy.table import Table, vstack
 
     # get brick names
+    # TODO: THIS IS SLOW! DIRECTLY SAVE THE URL, NO NEED TO DOWNLOAD THE CATALOGS
     url = f"https://www.legacysurvey.org/viewer/ls-dr10/cat.fits?ralo={ralo}&rahi={rahi}&declo={declo}&dechi={dechi}"
     desi_cat = fits.open(url)
     desi_cat = Table(desi_cat[1].data)
     bricks = list(set(desi_cat['brickname']))
     print("bricks:", bricks)
-    
-    file_path  = "/home/pku/Astro/FEASTS_SED/data/ancillary/"
 
     # download and stack catalogs in different bricks
     desi_cat = []
     for brick in bricks:
         brick_name = f"tractor-{brick}.fits"
-        if brick_name not in os.listdir(file_path):
+        if brick_name not in os.listdir(out_path):
             sn = "north" if dechi > 32 else "south"
             url = f"https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/{sn}/tractor/{brick[:3]}/{brick_name}"
-            os.system(f"wget -O {file_path}{brick_name} {url}")
+            os.system(f"wget -c {out_path}{brick_name} {url}")
             
-        desi_cat.append( Table.read(file_path + brick_name) )
+        desi_cat.append( Table.read(out_path + brick_name) )
 
     return vstack(desi_cat)
 

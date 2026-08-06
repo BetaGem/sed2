@@ -1,12 +1,17 @@
-import numpy as np 
 import bagpipes as pipes
+import numpy as np
 from astropy.table import Table
 
 from ..path import PATH
 from ..utils import file_name
 
-__all__ = ["load_phot", "load_filters", "fit_info", 
-           "build_all", "run"]
+__all__ = [
+    "build_all",
+    "fit_info",
+    "load_filters",
+    "load_phot",
+    "run",
+]
 
 # functions
 # -----------------------------
@@ -154,7 +159,7 @@ def build_all(ID, flux_table, filter_list=None,
         filters = catalog.colnames[1:] # use all filters in the table
 
     # check if Halpha is in the filter list
-    halpha = True if 'ha' in file_name(filters) else False
+    halpha = 'ha' in file_name(filters)
 
     # load priors calibrated from spectroscopic data
     ## you can modify this part to load your own priors

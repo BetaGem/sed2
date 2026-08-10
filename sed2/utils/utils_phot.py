@@ -153,7 +153,8 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None, apers=None,
                 mask[y-ap_p.shape[0]//2+1:y+1-ap_p.shape[0]//2+ap_p.shape[0],
                      x-ap_p.shape[1]//2+1:x+1-ap_p.shape[1]//2+ap_p.shape[1]] |= ap_p
                 aper_all.append(ap_rd)
-            except: pass
+            except (ValueError, TypeError, IndexError):
+                continue
 
     # get the fluxes in the random apertures
     ap_fluxes = [aper.do_photometry(img)[0] for aper in aper_all]
@@ -198,6 +199,7 @@ def save_flux(bin_flux, bin_flux_err, filters,
     Save the flux and flux error maps to FITS files.
     '''
     import os
+
     from astropy.table import Table
 
     n_bin = bin_flux.shape[0]

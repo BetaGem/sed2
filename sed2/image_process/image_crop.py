@@ -5,7 +5,7 @@ from astropy.coordinates import SkyCoord
 from astropy.nddata import Cutout2D
 
 from ..utils import *
-from SparseFit.path import PATH
+from sed2.path import PATH
 
 __all__ = ["remove_naninf_image_2dinterpolation",
            "remove_naninf_image_fill",

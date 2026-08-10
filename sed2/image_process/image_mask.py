@@ -158,8 +158,8 @@ def center_stars(name, hdu, seg_center, year_to_gaia=-12, coord=None):
     # skip sources outside the mask and at image center
     cstars_index = []
     for i in range(len(stars)):
-        x = int(round(stars['xcentroid'][i]))
-        y = int(round(stars['ycentroid'][i]))
+        x = round(stars['xcentroid'][i])
+        y = round(stars['ycentroid'][i])
         if x < 0 or y < 0 or x >= hdu.data.shape[1] or y >= hdu.data.shape[0]:
             continue
         if seg_center[y][x] == 0:
@@ -188,8 +188,8 @@ def get_high_z_source(hdu, tractor_cat, sweep_cat, seg_center, gal_z=0):
     highz_idx = []
     for i in range(len(tractor_cat)):
         # skip sources outside the mask
-        x = int(round(tractor_cat_highz['xcentroid'][i]))
-        y = int(round(tractor_cat_highz['ycentroid'][i]))
+        x = round(tractor_cat_highz['xcentroid'][i])
+        y = round(tractor_cat_highz['ycentroid'][i])
         if x < 0 or y < 0 or x >= hdu.data.shape[1] or y >= hdu.data.shape[0]:
             continue
         if seg_center[y][x] == 0:

@@ -1,1 +1,1 @@
-from . import SparseFit
+from . import sed2

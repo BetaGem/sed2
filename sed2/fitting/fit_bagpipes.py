@@ -163,7 +163,7 @@ def build_all(ID, flux_table, filter_list=None,
 
     # load priors calibrated from spectroscopic data
     ## you can modify this part to load your own priors
-    ## by default, the priors are produces in SparseFit.binning.pix_priors
+    ## by default, the priors are produces in sed2.binning.pix_priors
     zgas, dust_ratio = None, None
 
     if manual_prior is not None:

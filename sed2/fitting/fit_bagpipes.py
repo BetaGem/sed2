@@ -69,6 +69,10 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
              use_halpha=False, nebular_metallicity=None, dust_ratio=None):
     """
     Create the fit instruction dictionary.
+
+    The users should modify this function to change the SED models and priors.
+    For more details, please refer to the Bagpipes documentation:
+    https://bagpipes.readthedocs.io
     """
     fit_instructions = {}
     fit_instructions["t_bc"] = 0.01

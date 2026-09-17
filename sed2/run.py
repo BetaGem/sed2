@@ -234,17 +234,17 @@ def run(par_file=None):
             print(f"\n>>> SED fitting (2nd-pass) [{galaxy}] (this can be slow ...)")
 
             path_ft = workdir / "flux" / "flux_table.fits"
-            # if utils.check_output(path_ft):
-            #     continue
+            if utils.check_output(path_ft):
+                continue
 
-            # utils.load_filters_from_txt(workdir / "aux" / "filters_lowres.txt")
-            # fitting.predict_flux_table(workdir,
-            #                            filters=params["filters"],
-            #                            galaxy=galaxy, run="_highres",
-            #                            manual_prior=params.get("manual_prior", None),
-            #                            n_processes=nprocess)
-            # fitting.new_flux_table(workdir, 
-            #                        out_file=path_ft)
+            utils.load_filters_from_txt(workdir / "aux" / "filters_lowres.txt")
+            fitting.predict_flux_table(workdir,
+                                       filters=params["filters"],
+                                       galaxy=galaxy, run="_highres",
+                                       manual_prior=params.get("manual_prior", None),
+                                       n_processes=nprocess)
+            fitting.new_flux_table(workdir, 
+                                   out_file=path_ft)
             fitting.fit_all(workdir, 
                             flux_table=path_ft,
                             redshift=params["redshift"],

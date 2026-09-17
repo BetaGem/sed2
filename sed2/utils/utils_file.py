@@ -40,7 +40,10 @@ def read_par(par_file):
                 try:
                     val = [int(v) for v in vals]
                 except ValueError:
-                    val = vals
+                    try:
+                        val = [float(v) for v in vals]
+                    except ValueError:
+                        val = vals
             else:
                 try:
                     val = int(val)

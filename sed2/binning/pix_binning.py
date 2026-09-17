@@ -246,18 +246,18 @@ def pixel_binning(workdir, ref_band,
         else:
             dr_growth_cp = dr_growth
             stat_increase = 1
-            cumul_rows = rows1.tolist()
-            cumul_cols = cols1.tolist()
 
-            this_bin_map = np.full((dim_y,dim_x), 0)
-            this_bin_map[cumul_rows, cumul_cols] = 1
+            # boolean map of pixels already assigned to this bin
+            this_bin_map = np.zeros((dim_y, dim_x), dtype=bool)
+            this_bin_map[rows1, cols1] = True
+            n_cumul = len(rows1)
             if verbose:
                 print("\n", count_bin + 1, "SNR low, growing bin...")
 
             while stat_increase == 1:
 
                 # select pixels near the previous region
-                neighbor_pix = get_neighboring_pixels(this_bin_map > 0, r_growth)
+                neighbor_pix = get_neighboring_pixels(this_bin_map, r_growth)
                 rows1, cols1 = np.where(neighbor_pix & (gal_region==1) & (pixbin_map==0))
 
                 # select the bright half of these pixels (bright & within RoI & not occupied by other bins)
@@ -275,20 +275,19 @@ def pixel_binning(workdir, ref_band,
                     rows1, cols1 = np.where(pix_select)
 
                 # check similarity of SED shape (with the central pixel of this bin)
-                cent_pix_SED_flux      = np.zeros((dim_y, dim_x, n_band))
-                cent_pix_SED_flux_err = np.zeros((dim_y, dim_x, n_band))
-                norm0 = np.zeros((n_band, dim_y, dim_x))
+                cent_flux     = map_flux_trans[bin_y_cent, bin_x_cent]
+                cent_flux_err = map_flux_err_corr_trans[bin_y_cent, bin_x_cent]
 
-                cent_pix_SED_flux[rows1, cols1] = map_flux_trans[bin_y_cent][bin_x_cent]
-                cent_pix_SED_flux_err[rows1, cols1] = map_flux_err_corr_trans[bin_y_cent][bin_x_cent]
+                pix_flux     = map_flux_trans[rows1, cols1]
+                pix_flux_err = map_flux_err_corr_trans[rows1, cols1]
+                denom = np.square(pix_flux_err) + np.square(cent_flux_err)
 
-                top0 = np.nansum(map_flux_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1] / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
-                bottom0 = np.nansum(np.square(cent_pix_SED_flux[rows1, cols1]) / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
-                for i in range(n_band):
-                    norm0[i][rows1, cols1] = top0 / bottom0
-                # transpose from (band,y,x) -> (y,x,band)
-                norm0_trans = np.transpose(norm0, axes=(1,2,0))
-                pix_chi2 = np.nansum(np.square(map_flux_trans[rows1, cols1] - (norm0_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1])) / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
+                top0    = np.nansum(pix_flux * cent_flux / denom, axis=1)
+                bottom0 = np.nansum(np.square(cent_flux) / denom, axis=1)
+                norm0   = top0 / bottom0
+
+                pix_chi2 = np.nansum(np.square(pix_flux - norm0[:, None] * cent_flux)
+                                     / denom, axis=1)
 
                 idx_sel = np.where((pix_chi2 / n_band) <= redc_chi2_limit)
 
@@ -296,11 +295,12 @@ def pixel_binning(workdir, ref_band,
                 rows1_cut = rows1[idx_sel[0]]
                 cols1_cut = cols1[idx_sel[0]]
 
-                cumul_rows = cumul_rows + rows1_cut.tolist()
-                cumul_cols = cumul_cols + cols1_cut.tolist()
-                # avoid double-counting (https://stackoverflow.com/questions/53389236)
-                magic_array = np.array(list(set(map(tuple, np.array([cumul_rows, cumul_cols]).T)))).T
-                cumul_rows, cumul_cols = list(magic_array[0]), list(magic_array[1])
+                # avoid double-counting: only add pixels not already in this bin
+                new_pix = ~this_bin_map[rows1_cut, cols1_cut]
+                rows1_new = rows1_cut[new_pix]
+                cols1_new = cols1_cut[new_pix]
+                this_bin_map[rows1_new, cols1_new] = True
+                n_cumul += len(rows1_new)
 
                 # get total fluxes of the updated bin
                 tot_bin_flux = tot_bin_flux + np.sum(map_flux_trans[rows1_cut, cols1_cut], axis=0)
@@ -312,17 +312,18 @@ def pixel_binning(workdir, ref_band,
                 if len(idx0[0]) == n_band:    # if SNR is high enough
                     # get bin
                     count_bin = count_bin + 1
-                    pixbin_map[cumul_rows, cumul_cols] = count_bin
-                    cumul_npixs_in_bin = cumul_npixs_in_bin + len(cumul_rows)
+                    pixbin_map[this_bin_map] = count_bin
+                    cumul_npixs_in_bin = cumul_npixs_in_bin + n_cumul
 
                     stat_increase = 0
                     if verbose: 
                         print(count_bin, "SNR satisfied, bin finished.")
                 else:
                     # check remaining pixels
-                    rows_rest, cols_rest = np.where((gal_region==1) & (pixbin_map==0))
-                    tflux = np.sum(map_flux_trans[rows_rest, cols_rest], axis=0)
-                    tflux_err2 = np.sum(np.square(map_flux_err_trans[rows_rest, cols_rest]), axis=0)
+                    # (pixbin_map has not changed for this bin yet, so the
+                    #  outer rows/cols are still the unassigned pixels)
+                    tflux = np.sum(map_flux_trans[rows, cols], axis=0)
+                    tflux_err2 = np.sum(np.square(map_flux_err_trans[rows, cols]), axis=0)
                     tSNR = np.nan_to_num(tflux / np.sqrt(tflux_err2))
                     tidx = np.where(tSNR >= snr_thresh * out_snr_factor)
 
@@ -330,19 +331,19 @@ def pixel_binning(workdir, ref_band,
                     if len(tidx[0]) < n_band or r_growth > np.sqrt(np.sum(gal_region) / np.pi):   
                         # bin all remaining pixels:
                         count_bin = count_bin + 1
-                        pixbin_map[rows_rest, cols_rest] = count_bin
-                        cumul_npixs_in_bin = cumul_npixs_in_bin + len(rows_rest)
+                        pixbin_map[rows, cols] = count_bin
+                        cumul_npixs_in_bin = cumul_npixs_in_bin + len(rows)
 
                         stat_increase = 0
                         if verbose:
                             print(count_bin, "SNR not satisfied, bin finished with all remaining pixels.")
                         break
 
-                    elif (len(cumul_rows) + cumul_npixs_in_bin) == tot_npixs:  # if all pixels have been binned
+                    elif (n_cumul + cumul_npixs_in_bin) == tot_npixs:  # if all pixels have been binned
                         # get bin
                         count_bin = count_bin + 1
-                        pixbin_map[cumul_rows, cumul_cols] = count_bin
-                        cumul_npixs_in_bin = cumul_npixs_in_bin + len(cumul_rows)
+                        pixbin_map[this_bin_map] = count_bin
+                        cumul_npixs_in_bin = cumul_npixs_in_bin + n_cumul
 
                         stat_increase = 0
                         if verbose:
@@ -360,10 +361,8 @@ def pixel_binning(workdir, ref_band,
                     dr_growth_cp += 3
                     if verbose:
                         print(count_bin, "growing radius increased to", r_growth)
-                else:
-                    this_bin_map[rows1_cut, cols1_cut] = count_bin
-                    if verbose:
-                        print(count_bin, "growing pixels:", len(rows1_cut), ". this bin map", np.sum(this_bin_map > 0))
+                elif verbose:
+                    print(count_bin, "growing pixels:", len(rows1_new), ". this bin map", np.sum(this_bin_map))
 
         rows, cols = np.where((gal_region==1) & (pixbin_map==0))
         # end of while ...

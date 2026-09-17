@@ -7,7 +7,7 @@
 # ---------------------------------------------------------
 galaxy          NGC0628     # Galaxy name (e.g., NGC0628)
 workdir        /home/pku/Astro/sed2/demo/data      # Working directory
-steps           psf, roi, bin       # Pipeline steps to run (bkg, crop, mask, psf, roi, bin, fit, 2pass)
+steps           bin       # Pipeline steps to run (bkg, crop, mask, psf, roi, bin, fit, 2pass)
 n_process       8           # Number of parallel processes
 verbose         True        # Verbose output
 

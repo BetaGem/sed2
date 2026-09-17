@@ -80,7 +80,7 @@ def R_extinction(lamb_Ang, Rv=3.1):
 
 
 def bin_noise(img, bin_mask, aper_src=None, mask_src=None, apers=None,
-              bootstrap=100, max_overlap=0.1, circle_aper=False):
+              bootstrap=100, max_overlap=0.1, circle_aper=False, seed=42):
     '''
     Estimate the uncertainties by randomly sampling the blank sky.
 
@@ -102,6 +102,9 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None, apers=None,
         The maximum allowed overlap between the random apertures.
     circle_aper : bool
         Whether to use circular apertures for random sampling.
+    seed : int
+        Seed for the local random number generator. A local generator is
+        used so that the global NumPy RNG state is left untouched.
 
     Returns
     -------
@@ -111,11 +114,11 @@ def bin_noise(img, bin_mask, aper_src=None, mask_src=None, apers=None,
         The total flux of the source.
     '''
     from photutils.aperture import EllipticalAperture
-    
-    # random positions and angles
-    np.random.seed(42)
-    xy_rd = np.random.rand(bootstrap, 2) * img.shape[0]
-    theta_rd = np.random.rand(bootstrap) * 2 * np.pi
+
+    # random positions and angles (local RNG, does not touch global state)
+    rng = np.random.default_rng(seed)
+    xy_rd = rng.random((bootstrap, 2)) * img.shape[0]
+    theta_rd = rng.random(bootstrap) * 2 * np.pi
 
     # exclude sources from noise estimation
     if aper_src is not None:

@@ -1,224 +1,187 @@
 {
-    "filter_name":{
-        "fname": "file name",
+    "filter_name": {
         "cali_err": "calibration uncertainty of this filter",
         "psf_fwhm": "PSF FWHM of this filter",
         "default_unit": "flux or surface brightness (sb)"
     },
     "galex_fuv": {
-        "fname": "GALEX_FUV",
         "cali_err": 4.5,
         "psf_fwhm": 4.48,
         "default_unit": "flux"
     },
     "galex_nuv": {
-        "fname": "GALEX_NUV",
         "cali_err": 2.7,
         "psf_fwhm": 5.05,
         "default_unit": "flux"
     },
     "sdss_u": {
-        "fname": "SDSS_u",
         "cali_err": 1.3,
         "psf_fwhm": 1.4,
         "default_unit": "flux"
     },
     "sdss_g": {
-        "fname": "SDSS_g",
         "cali_err": 0.8,
         "psf_fwhm": 1.4,
         "default_unit": "flux"
     },
     "sdss_r": {
-        "fname": "SDSS_r",
         "cali_err": 0.8,
         "psf_fwhm": 1.2,
         "default_unit": "flux"
     },
     "sdss_i": {
-        "fname": "SDSS_i",
         "cali_err": 0.7,
         "psf_fwhm": 1.2,
         "default_unit": "flux"
     },
     "sdss_z": {
-        "fname": "SDSS_z",
         "cali_err": 0.8,
         "psf_fwhm": 1.2,
         "default_unit": "flux"
     },
     "2mass_j": {
-        "fname": "2MASS_J",
         "cali_err": 1.7,
         "psf_fwhm": 3.4,
         "default_unit": "flux"
     },
     "2mass_h": {
-        "fname": "2MASS_H",
         "cali_err": 1.9,
         "psf_fwhm": 3.4,
         "default_unit": "flux"
     },
     "2mass_k": {
-        "fname": "2MASS_Ks",
         "cali_err": 1.9,
         "psf_fwhm": 3.5,
         "default_unit": "flux"
     },
     "wise_w1": {
-        "fname": "WISE_3.4",
         "cali_err": 2.9,
         "psf_fwhm": 5.79,
         "default_unit": "flux"
     },
     "wise_w2": {
-        "fname": "WISE_4.6",
         "cali_err": 3.4,
         "psf_fwhm": 6.37,
         "default_unit": "flux"
     },
     "wise_w3": {
-        "fname": "WISE_12",
         "cali_err": 4.6,
-        "psf_fwhm": 6.60,
+        "psf_fwhm": 6.6,
         "default_unit": "flux"
     },
     "wise_w4": {
-        "fname": "WISE_22",
         "cali_err": 5.4,
-        "psf_fwhm": 15.00,
+        "psf_fwhm": 15.0,
         "default_unit": "flux"
     },
     "spitzer_irac_36": {
-        "fname": "Spitzer_3.6",
         "cali_err": 3.0,
         "psf_fwhm": 1.9,
         "default_unit": "sb"
     },
     "spitzer_irac_45": {
-        "fname": "Spitzer_4.5",
         "cali_err": 3.0,
         "psf_fwhm": 1.81,
         "default_unit": "sb"
     },
     "spitzer_irac_58": {
-        "fname": "Spitzer_5.8",
         "cali_err": 3.0,
         "psf_fwhm": 2.11,
         "default_unit": "sb"
     },
     "spitzer_irac_80": {
-        "fname": "Spitzer_8.0",
         "cali_err": 3.0,
         "psf_fwhm": 2.82,
         "default_unit": "sb"
     },
     "spitzer_mips_24": {
-        "fname": "Spitzer_24",
         "cali_err": 5.0,
         "psf_fwhm": 6.43,
         "default_unit": "sb"
     },
     "spitzer_mips_70": {
-        "fname": "Spitzer_70",
         "cali_err": 10.0,
         "psf_fwhm": 18.74,
         "default_unit": "sb"
     },
     "spitzer_mips_160": {
-        "fname": "Spitzer_160",
         "cali_err": 12.0,
         "psf_fwhm": 38.78,
         "default_unit": "sb"
     },
     "herschel_pacs_70": {
-        "fname": "PACS_70",
         "cali_err": 7.0,
         "psf_fwhm": 5.67,
         "default_unit": "flux"
     },
     "herschel_pacs_100": {
-        "fname": "PACS_100",
         "cali_err": 7.0,
         "psf_fwhm": 7.04,
         "default_unit": "flux"
     },
     "herschel_pacs_160": {
-        "fname": "PACS_160",
         "cali_err": 7.0,
         "psf_fwhm": 11.18,
         "default_unit": "flux"
     },
     "herschel_spire_250": {
-        "fname": "SPIRE_250",
         "cali_err": 5.5,
         "psf_fwhm": 18.15,
         "default_unit": "flux"
     },
     "herschel_spire_350": {
-        "fname": "SPIRE_350",
         "cali_err": 5.5,
         "psf_fwhm": 24.88,
         "default_unit": "flux"
     },
     "herschel_spire_500": {
-        "fname": "SPIRE_500",
         "cali_err": 5.5,
         "psf_fwhm": 36.05,
         "default_unit": "flux"
     },
     "bok_halpha_657": {
-        "fname": "ha",
         "cali_err": 5.0,
         "psf_fwhm": 1.5,
         "default_unit": "flux"
     },
     "kpno_kp1563": {
-        "fname": "ha",
         "cali_err": 5.0,
         "psf_fwhm": 1.5,
         "default_unit": "flux"
     },
     "kpno_kp1564": {
-        "fname": "ha",
         "cali_err": 5.0,
         "psf_fwhm": 1.5,
         "default_unit": "flux"
     },
     "ctio_ct6602": {
-         "fname": "ha",
-         "cali_err": 5.0,
-         "psf_fwhm": 1.5,
-         "default_unit": "flux"
+        "cali_err": 5.0,
+        "psf_fwhm": 1.5,
+        "default_unit": "flux"
     },
     "ctio_ct6586": {
-         "fname": "ha",
-         "cali_err": 5.0,
-         "psf_fwhm": 1.5,
-         "default_unit": "flux"
+        "cali_err": 5.0,
+        "psf_fwhm": 1.5,
+        "default_unit": "flux"
     },
     "vatt_halpha_658": {
-         "fname": "ha",
-         "cali_err": 5.0,
-         "psf_fwhm": 1.5,
-         "default_unit": "flux"
+        "cali_err": 5.0,
+        "psf_fwhm": 1.5,
+        "default_unit": "flux"
     },
     "ukirt_wfcam_J": {
-        "fname": "UHS_J",
         "cali_err": 2.3,
         "psf_fwhm": 0.75,
         "default_unit": "flux"
     },
     "ukirt_wfcam_H": {
-        "fname": "UHS_H",
         "cali_err": 2.3,
         "psf_fwhm": 0.75,
         "default_unit": "flux"
     },
     "ukirt_wfcam_K": {
-        "fname": "UHS_K",
         "cali_err": 2.3,
-        "psf_fwhm": 0.70,
+        "psf_fwhm": 0.7,
         "default_unit": "flux"
     }
 }

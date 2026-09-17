@@ -1,30 +1,30 @@
-import sys
+import sys  # noqa: EXE002
+from pathlib import Path
+
 import numpy as np
 from astropy.io import fits
-from astropy.coordinates import SkyCoord
-from scipy.ndimage import binary_fill_holes, binary_dilation
+from scipy.ndimage import binary_dilation, binary_fill_holes
 
 from ..utils import *
-from ..path import PATH
 
-__all__ = ["galaxy_region", "flux_map", "plot_flux_maps", "plot_sample_sed"]
+__all__ = ["flux_map", "galaxy_region", "plot_flux_maps", "plot_sample_sed"]
 
 
-def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
+def galaxy_region(workdir, galaxy, roi_bands=None,
                   thresh=3, npixels=50, dilate_iter=3, 
-                  plot_region=True, plot_idx=0,
-                  out_file=None, **kwargs):
+                  plot_region=True, plot_band='galex_fuv',
+                  **kwargs):
     '''
     Select galaxy regions from pixel binning.
     ----------
     Parameters
     ----------
-    matched_path : str
-        The path to the matched data.
-    matched_img : dict
-        The paths for matched image data.
-    matched_var : dict
-        The paths for matched variance data.
+    workdir : str
+        The path to the working directory.
+    galaxy : str
+        The name of the galaxy.
+    roi_bands : int, list, str, tuple, optional
+        The bands to use for selecting the region of interest.
     thresh : float
         The threshold for source detection.
     npixels : int
@@ -33,41 +33,35 @@ def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
         The number of iterations for binary dilation.
     plot_region : bool
         Whether to plot the detected galaxy regions.
-    plot_idx : int
-        The index of band to plot.
-    out_file : str
-        The path to the output file for the galaxy region mask.
+    plot_band : str
+        The band to plot.
     **kwargs : keyword arguments
         Additional arguments passed to the deblend_sources function.
     '''
-    from photutils.segmentation import detect_sources, deblend_sources
+    from photutils.segmentation import deblend_sources, detect_sources
 
-    matched_img = list(matched_img.values())
-    matched_var = list(matched_var.values())
+    path = Path(workdir)
+    if check_output(path / "flux" / "roi.npy"):
+        return 
 
-    if filter_ids is None:
-        filter_ids = np.arange(len(matched_img))
+    filters = load_filters_from_txt(workdir / "aux" / "filter_list.txt")
+    filter_ids = load_filter_ids(workdir, roi_bands)
 
     segments_all = []
+
     for i in filter_ids:
 
-        try: 
-            img = fits.open(matched_path + matched_img[i])[0].data
-            var = fits.open(matched_path + matched_var[i])[0].data
-        except FileNotFoundError:
-            # low resolution filters are not available
-            continue
+        img = fits.open(path / "matched" / f"{galaxy}_{filters[i]}.fits")[0].data
+        var = fits.open(path / "matched" / f"var_{galaxy}_{filters[i]}.fits")[0].data
 
         # Detect sources in the matched image
         var[~(var > 0)] = +np.inf
         sources = detect_sources(img, threshold=thresh * np.sqrt(var), 
                                  npixels=npixels)
-
         # Deblend sources
         deblended = deblend_sources(img, sources, 
                                     npixels=npixels, progress_bar=False,
                                     **kwargs)
-
         # keep the central segment
         segm = deblended.data
         segm[segm != segm[segm.shape[0]//2, segm.shape[1]//2]] = 0
@@ -80,34 +74,32 @@ def galaxy_region(matched_path, matched_img, matched_var, filter_ids=None,
         gal_region[segm > 0] = 1
 
     # post-processing
-    gal_region = binary_dilation(gal_region, iterations=dilate_iter, 
+    gal_region = binary_dilation(gal_region, 
+                                 iterations=dilate_iter, 
                                  structure=np.array([[0,1,0],[1,1,1],[0,1,0]]))
     gal_region = binary_fill_holes(gal_region).astype(np.int8)
 
     # plot the results
     if plot_region:
         import matplotlib.pyplot as plt
-        img = fits.open(matched_path + matched_img[plot_idx])[0].data
+        img = fits.open(path / "matched" / f"{galaxy}_{plot_band}.fits")[0].data
         plt.figure(figsize=(4, 4))
-        plt.subplot(111)
         plt.imshow(img, origin='lower', cmap='turbo',
                    vmin=np.nanpercentile(img, 16),
                    vmax=np.nanpercentile(img, 99))
         plt.imshow(gal_region, origin='lower', cmap='gray', alpha=0.3)
-        plt.title("Region")
-        plt.show()
+        plt.title("Region-of-interest (RoI)")
+        plt.savefig(path / "plot" / "roi.png", dpi=300, bbox_inches='tight')
 
-    if out_file is not None:
-        np.save(out_file, gal_region)
-
+    np.save(path / "flux" / "roi.npy", gal_region)
     return gal_region
 
 
 
-def flux_map(img_path, sci_img, var_img, filters, gal_region, 
-             Ebv=None, mag_zp_2mass=None, 
-             unit_spire='Jy_per_beam', scale_unit=1e-17, img_unit={}, dp_unit=False,
-             ref_band='wise_w4', gname='', name_out_fits=None):
+def flux_map(workdir, galaxy, filters, 
+             Ebv=None, coord=None, mag_zp_2mass=None, 
+             unit_spire='Jy_per_beam', scale_unit=1e-17, img_unit=None, dp_unit=False,
+             ref_band='wise_w4', name_out_fits=None):
     '''
     Calculating the maps of multiband fluxes from the matched images.
     This function is adopted from piXedfit (Abdurro'uf et al. 2021)
@@ -116,18 +108,16 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
 
     Parameters:
     -----------
-    img_path : str
-        The path to the image files.
-    sci_img : dict
-        The paths for science image data.
-    var_img : dict
-        The paths for variance image data.
+    workdir : str
+        The path to the working directory.
+    galaxy : str
+        The name of the galaxy.
     filters : list
         The list of filters to use.
-    gal_region : np.ndarray
-        The galaxy region mask.
     Ebv : float, optional
         The E(B-V) value for dust extinction correction.
+    coord : astropy.coordinates.SkyCoord, optional
+        The coordinates of the galaxy.
     mag_zp_2mass : list, optional
         The magnitude zero-points for 2MASS.
     unit_spire : str, optional
@@ -138,8 +128,6 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
         The units for the image data.
     dp_unit : bool, optional
         Whether to use DustPedia units (Jy/pixel).
-    gname : str, optional
-        The name of the galaxy.
     ref_band : str, optional
         The reference band.
     name_out_fits : str, optional
@@ -147,19 +135,23 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
     '''
 
     # calculate Milky Way extinction
+    if img_unit is None:
+        img_unit = {}
     if Ebv is None:
-        coord = SkyCoord.from_name(gname)
+        if coord is None:
+            raise ValueError("Either Ebv or coord must be provided.")
         Ebv = get_ebv(coord=coord)
+
+    gal_region = np.load(workdir / "flux" / "roi.npy")
 
     wave_piv = np.array([get_filter_waves(f)[1] for f in filters])
     A_lambda = np.array([R_extinction(wave) for wave in wave_piv]) * Ebv
     A_factor = 10**(0.4 * A_lambda)
 
     # load reference band
-    ref_img = fits.open(img_path + sci_img[ref_band])
-    ref_var = fits.open(img_path + var_img[ref_band])
-    pix_scale = get_pixel_size(img_path + sci_img[ref_band])
-    
+    ref_img = fits.open(workdir / "matched" / f"{galaxy}_{ref_band}.fits")
+    ref_var = fits.open(workdir / "matched" / f"var_{galaxy}_{ref_band}.fits")
+    pix_scale = get_pixel_size(workdir / "matched" / f"{galaxy}_{ref_band}.fits")
 
     # setup
     n_band = len(filters)
@@ -170,8 +162,8 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
     for i in range(n_band):
 
         # load science and variance images
-        sci_hdu = fits.open(img_path + sci_img[filters[i]])
-        var_hdu = fits.open(img_path + var_img[filters[i]])
+        sci_hdu = fits.open(workdir / "matched" / f"{galaxy}_{filters[i]}.fits")
+        var_hdu = fits.open(workdir / "matched" / f"var_{galaxy}_{filters[i]}.fits")
         sci_img_data = sci_hdu[0].data
         var_img_data = var_hdu[0].data
         sci_hdu.close()
@@ -194,7 +186,7 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
         if '2mass' in filters[i]:
             # get magnitude zero-point, -8.9 for Jy/pixel
             if mag_zp_2mass is None:
-                hdu = fits.open(img_path + sci_img[filters[i]])
+                hdu = fits.open(workdir / "matched" / f"{galaxy}_{filters[i]}.fits")
                 MAGZP_2mass = float(hdu[0].header["MAGZP"])
                 hdu.close()
             else:
@@ -261,15 +253,9 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
             map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * DN_to_Jy * 1.0e-23 * 2.998e+18 / wave_piv[i]**2   # in erg/s/cm^2/Ang.
 
         # !! -- w4 from z0mgs is in Jy -- !!
-        elif filters[i] == 'wise_w4':
+        elif filters[i] == 'wise_w4' or filters[i] in ['herschel_pacs_70', 'herschel_pacs_100', 'herschel_pacs_160']:
             map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2                        # in erg/s/cm^2/Ang.
             map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.0e-23 * 2.998e+18 / wave_piv[i]**2   # in erg/s/cm^2/Ang.
-            
-        # Herschel PACS
-        # image is in Jy/pixel or Jy --> this is not surface brightness unit but flux density
-        elif filters[i] in ['herschel_pacs_70', 'herschel_pacs_100', 'herschel_pacs_160']:
-            map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2                          # in erg/s/cm^2/Ang.
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.0e-23 * 2.998e+18 / wave_piv[i]**2     # in erg/s/cm^2/Ang.
 
         # Herschel SPIRE
         elif filters[i] in ['herschel_spire_250', 'herschel_spire_350', 'herschel_spire_500']:
@@ -351,7 +337,7 @@ def flux_map(img_path, sci_img, var_img, filters, gal_region,
         
     if name_out_fits is None:
         name_out_fits = 'fluxmap.fits'
-    hdul.writeto(img_path + name_out_fits, overwrite=True)
+    hdul.writeto(workdir / "flux" / name_out_fits, overwrite=True)
 
     return name_out_fits
 
@@ -365,14 +351,13 @@ def plot_flux_maps(cube_path, out_path=None):
     with fits.open(cube_path) as hdu:
         header = hdu[0].header
         unit_flux = float(header['unit'])
-        gal_region   = hdu['GALAXY_REGION'].data
         flux_map     = hdu['FLUX'].data * unit_flux
         flux_err_map = hdu['FLUX_ERR'].data * unit_flux
 
     n_band = flux_map.shape[0]
 
     # flux map
-    fig, axes = plt.subplots(n_band//6 + 1, 6, figsize=(12, n_band / 3))
+    _fig, axes = plt.subplots(n_band//6 + 1, 6, figsize=(12, n_band / 3))
     for i in range(n_band):
         ax = axes[i // 6, i % 6]
         ax.imshow(np.log10(flux_map[i]), origin='lower', cmap='nipy_spectral')
@@ -380,11 +365,11 @@ def plot_flux_maps(cube_path, out_path=None):
 
     plt.tight_layout()
     if out_path is not None:
-        plt.savefig(out_path + f"flux_map.png")
+        plt.savefig(Path(out_path) / "flux_map.png")
     plt.show()
 
     # snr map
-    fig, axes = plt.subplots(n_band//6 + 1, 6, figsize=(12, n_band / 3))
+    _fig, axes = plt.subplots(n_band//6 + 1, 6, figsize=(12, n_band / 3))
     for i in range(n_band):
         ax = axes[i // 6, i % 6]
         ax.imshow(np.abs(flux_map[i] / flux_err_map[i]), 
@@ -395,7 +380,7 @@ def plot_flux_maps(cube_path, out_path=None):
 
     plt.tight_layout()
     if out_path is not None:
-        plt.savefig(out_path + f"snr_map.png")
+        plt.savefig(Path(out_path) / "snr_map.png")
     plt.show()
 
 
@@ -417,7 +402,7 @@ def plot_sample_sed(cube_path, x, y):
     wave_piv = np.array([get_filter_waves(header[f'FIL{i}'])[0] for i in range(n_band)])
 
     # Plot SED for a specific pixel (e.g., pixel at (x, y))
-    fig, ax = plt.subplots(figsize=(7, 3))
+    _fig, ax = plt.subplots(figsize=(7, 3))
     ax.errorbar(wave_piv / 1.0e+4, 
                 flux_map[:, y, x] * wave_piv, 
                 yerr=flux_err_map[:, y, x] * wave_piv,

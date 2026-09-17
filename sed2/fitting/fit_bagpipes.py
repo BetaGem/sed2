@@ -1,9 +1,8 @@
-import bagpipes as pipes
+import bagpipes as pipes  # noqa: EXE002
 import numpy as np
 from astropy.table import Table
 
 from ..path import PATH
-from ..utils import file_name
 
 __all__ = [
     "build_all",
@@ -12,6 +11,17 @@ __all__ = [
     "load_phot",
     "run",
 ]
+
+# Narrow-band H-alpha filters
+# TODO: add more filters if needed
+HA_FILTERS = {
+    "bok_halpha_657",
+    "kpno_kp1563",
+    "kpno_kp1564",
+    "ctio_ct6602",
+    "ctio_ct6586",
+    "vatt_halpha_658",
+}
 
 # functions
 # -----------------------------
@@ -49,8 +59,8 @@ def load_filters(filter_names):
     """
     Create a list of filter paths from sedpy.
     """
-    filter_path = f"{PATH}/filters"
-    filter_list = [f"{filter_path}/{f}.par" for f in filter_names]
+    filter_path = PATH / "filters"
+    filter_list = [filter_path / f"{f}.par" for f in filter_names]
 
     return np.array(filter_list)[fini]
 
@@ -150,6 +160,7 @@ def build_all(ID, flux_table, filter_list=None,
 
     # load basic info
     z = redshift
+    flux_table = str(flux_table)
     catalog = Table.read(flux_table)
     catalog_err = Table.read(flux_table.replace(".fits", "_err.fits"))
     
@@ -159,7 +170,7 @@ def build_all(ID, flux_table, filter_list=None,
         filters = catalog.colnames[1:] # use all filters in the table
 
     # check if Halpha is in the filter list
-    halpha = 'ha' in file_name(filters)
+    halpha = any(f in HA_FILTERS for f in filters)
 
     # load priors calibrated from spectroscopic data
     ## you can modify this part to load your own priors
@@ -194,7 +205,8 @@ def build_all(ID, flux_table, filter_list=None,
 
 def run(ID, flux_table, manual_prior=None, 
         filter_list=None, redshift=0.0022, 
-        run='.', nlive=1000, pool=1, verbose=True, **kwargs):
+        run='.', nlive=1000, pool=1, 
+        path='.', verbose=True, **kwargs):
     '''
     Run Bagpipes SED fitting.
     '''
@@ -202,6 +214,6 @@ def run(ID, flux_table, manual_prior=None,
     galaxy, fit_inst = build_all(ID, flux_table, filter_list, 
                                  redshift, manual_prior)
 
-    fit = pipes.fit(galaxy, fit_inst, run=run)
+    fit = pipes.fit(galaxy, fit_inst, run=run, path=path)
     fit.fit(sampler="nautilus", 
             verbose=verbose, n_live=nlive, pool=pool, **kwargs)

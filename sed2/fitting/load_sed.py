@@ -1,6 +1,6 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import bagpipes as pipes
+import matplotlib.pyplot as plt
+import numpy as np
 
 from ..utils.utils_filter import get_filter_trans_curve
 from . import fit_bagpipes
@@ -8,14 +8,14 @@ from . import fit_bagpipes
 __all__ = ["BSEDresults"]
 
 
-class BSEDresults(object):
+class BSEDresults:
     """
     Class to handle SED fitting results from Bagpipes
     (assuming a non-parametric SFH).
     """
     def __init__(self, name, ID, flux_table, manual_prior=None,
                  filter_list=None, redshift=0.0022, distance=0, run='',
-                 advanced=False, path_posterior='', n_posterior=1000,
+                 advanced=False, path_posterior='.', n_posterior=1000,
                  save_memory=False):
         """
         Initialize the SEDresults object with the result files.
@@ -160,7 +160,7 @@ class BSEDresults(object):
         elif plot_range == 'Hb':    
             xmin, xmax = 4.8e3, 5.2e3
         elif plot_range == 'user':
-            xmin, xmax = xmin, xmax
+            pass
         if ymin is None or ymax is None:
             ymin = np.min(spec_post[:, 1][(wav > xmin) & (wav < xmax)])
             ymax = np.max(spec_post[:, 1][(wav > xmin) & (wav < xmax)])
@@ -247,7 +247,7 @@ class BSEDresults(object):
         post = temp_sed.fit.posterior
         ndof = temp_sed.fit.galaxy.photometry.shape[0]
 
-        if 'chisq_phot' in post.samples.keys():
+        if 'chisq_phot' in post.samples:
             chi2_rd = post.samples['chisq_phot'].min() / ndof
         else:
             temp_sed.fit.posterior.get_advanced_quantities()
@@ -262,6 +262,7 @@ class BSEDresults(object):
         Estimate dust mass from the samples.
         """
         from copy import deepcopy
+
         from bagpipes.models.model_galaxy import model_galaxy
         
         sed = deepcopy(self)

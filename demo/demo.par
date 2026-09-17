@@ -1,0 +1,73 @@
+# =========================================================
+# SED2 parameter file
+# =========================================================
+
+# ---------------------------------------------------------
+# Basic I/O
+# ---------------------------------------------------------
+galaxy          NGC0628     # Galaxy name (e.g., NGC0628)
+workdir        /home/pku/Astro/sed2/demo/data      # Working directory
+steps           psf, roi, bin       # Pipeline steps to run (bkg, crop, mask, psf, roi, bin, fit, 2pass)
+n_process       8           # Number of parallel processes
+verbose         True        # Verbose output
+
+# ---------------------------------------------------------
+# Background subtraction
+# ---------------------------------------------------------
+bkg_ref_band    galex_fuv   # Reference band for background mask
+bkg_ref_sigma   1.0          # Sigma-clipping threshold for background mesh
+bkg_box_size    none        # Background mesh box size (none = auto)
+bkg_mask_thresh 2.5         # Source-detection threshold for the mask
+bkg_npixels     10          # Minimum number of pixels for a source
+bkg_gaussian_noise True     # Model background noise with a Gaussian
+bkg_plot_mask   True        # Plot the background source mask
+
+# ---------------------------------------------------------
+# Cropping
+# ---------------------------------------------------------
+crop_size       1800             # Crop size in arcsec
+ra              24.173938        # RA center in deg (none = resolve from galaxy)
+dec             15.783641        # Dec center in deg (none = resolve from galaxy)
+
+# ---------------------------------------------------------
+# Masking
+# ---------------------------------------------------------
+mask_deblend    False       # Deblend the target mask
+mask_box        3           # Inner-mask crop size (in FWHM)
+mask_box_large  6           # Inner-mask crop size for bright stars (in FWHM)
+mask_in_thresh  1.5         # Inner-mask detection threshold
+mask_in_dilate  1.5         # Inner-mask dilation (in FWHM)
+mask_out_thresh 3.0         # Outer source-detection nsigma threshold
+mask_clean      True        # Remove regions connected to the central mask
+
+# ---------------------------------------------------------
+# PSF matching
+# ---------------------------------------------------------
+psf_ref_band    wise_w4     # Reference band (target resolution)
+psf_img_unit    flux        # Unit of images: flux or sb (surface brightness)
+
+# ---------------------------------------------------------
+# Region of Interest
+# ---------------------------------------------------------
+roi_bands       galex,sdss  # Reference bands for defining RoI
+roi_thresh      3           # Source detection threshold in the ref. bands
+roi_dilate      10          # Dilation of RoI mask in pixels
+dp_unit         True        # Whether the images are in Jy/pixel
+
+# ---------------------------------------------------------
+# Binning
+# ---------------------------------------------------------
+bin_ref_band    sdss_g      # Reference band for binning
+bin_snr_band    sdss,galex  # Bands that need to reach the min SNR
+bin_snr_thresh  10          # Minimal SNR for the bins
+bin_npix_min    5           # Minimum pixels per bin
+bin_chi2_lim    4.0         # Max reduced chi2 for SED similarity
+bin_percent     50          # Percentile of pixels to be included
+
+# ---------------------------------------------------------
+# Fitting
+# ---------------------------------------------------------
+manual_prior    None        # User defined values of dust_eta and Z_gas
+redshift        0.0022      # Redshift should be positive and fixed
+n_live          1000        # Number of live points for nautilus sampler
+test_mode       True        # Only a few bins will be fitted in test mode

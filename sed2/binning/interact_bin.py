@@ -1,11 +1,13 @@
 import sys
+import pathlib
+
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 from matplotlib.patches import Ellipse, Circle, Polygon, PathPatch
 from matplotlib.path import Path
 
-PATH = "/home/pku/Astro/FEASTS_SED/data"
+PATH = pathlib.Path("/home/pku/Astro/FEASTS_SED/data")
 
 class GalaxyLabeler:
     def __init__(self, images, bands, save_path='pixbin_morph.npy', stretch_scale=5.0e4):
@@ -253,10 +255,10 @@ if __name__ == "__main__":
     images = []
     
     for fname in bands:
-        hdul = fits.open(f"{PATH}/{gname}/stamp_psfmatch_crop_skybgsub_{gname}_{fname}.fits")
+        hdul = fits.open(PATH / gname / f"stamp_psfmatch_crop_skybgsub_{gname}_{fname}.fits")
         # hdul = fits.open(f"./test_data/stamp_psfmatch_crop_skybgsub_{gname}_{fname}.fits")
         images.append(hdul[0].data)
     
-    labeler = GalaxyLabeler(images, bands, save_path=f"{PATH}/{gname}/pixbin_morph.npy")
+    labeler = GalaxyLabeler(images, bands, save_path=PATH / gname / "pixbin_morph.npy")
     # labeler = GalaxyLabeler(images, bands, save_path=f"./test_data/pixbin_morph_{gname}.npy")
     plt.show()

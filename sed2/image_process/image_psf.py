@@ -1,22 +1,27 @@
-import numpy as np 
-import sys, os, warnings
+import os  # noqa: EXE002
+import sys
 from pathlib import Path
-from astropy.io import fits
-from astropy.wcs import WCS 
-from astropy.nddata import Cutout2D
-from astropy.convolution import convolve_fft
-from reproject import reproject_interp
-from photutils.psf.matching import resize_psf
 
-from ..utils import *
+import numpy as np
+from astropy.convolution import convolve_fft
+from astropy.io import fits
+from astropy.nddata import Cutout2D
+from astropy.wcs import WCS
+from multiprocess import Pool
+from photutils.psf.matching import resize_psf
+from reproject import reproject_interp
+from tqdm import tqdm
+
 from ..path import PATH
+from ..utils import *
 
 __all__ = ['load_kernel', 'match_image']
 
 
-def load_kernel(band1, band2, pix_scale=None, eps=1e-3, gaussian_w4=True):
+def load_kernel(band1, band2, pix_scale=None, eps=1e-2, gaussian_w4=True):
     '''
     load a kernel for PSF matching from band1 to band2.
+    Replace this function with a more general with your own kernel library if needed.
 
     Parameters
     ----------
@@ -41,7 +46,7 @@ def load_kernel(band1, band2, pix_scale=None, eps=1e-3, gaussian_w4=True):
         if band1 == 'wise_w4': band1 = 'gauss15'
         if band2 == 'wise_w4': band2 = 'gauss15'
 
-    kernel_path = f"{PATH}/kernels/kernel_{band1}_to_{band2}.fits.gz"
+    kernel_path = PATH / "kernels" / f"kernel_{band1}_to_{band2}.fits.gz"
 
     if not os.path.exists(kernel_path):
         print(f"Kernel file kernel_{band1}_to_{band2}.fits.gz does not exist.")
@@ -58,21 +63,65 @@ def load_kernel(band1, band2, pix_scale=None, eps=1e-3, gaussian_w4=True):
     return kernel
 
 
-def match_image(img_path, sci_img, var_img, filters,
+def _match_band(args):
+    '''Match a single band's PSF (worker for multiprocessing).'''
+    path, galaxy, f, is_high_res, pix_scale, ref_band, target_wcs,\
+        target_pix_scale, out_shape, unit, out_path = args
+
+    hdu = fits.open(path / "masked" / f"{galaxy}_{f}.fits")
+    var = fits.open(path / "masked" / f"var_{galaxy}_{f}.fits")
+    wcs = WCS(hdu[0].header)
+
+    if is_high_res:
+        # load and crop kernel
+        kernel = load_kernel(f, ref_band, pix_scale=pix_scale)
+        kernel = Cutout2D(kernel, position=(kernel.shape[1]//2,
+                                            kernel.shape[0]//2),
+                          size=hdu[0].data.shape[0]//2, mode='trim').data
+        # convolve
+        psf_match_data = convolve_fft(hdu[0].data, kernel,
+                                      normalize_kernel=True, nan_treatment='fill',
+                                      preserve_nan=True, allow_huge=True)
+        psf_match_var = convolve_fft(var[0].data, kernel**2 / np.sum(kernel**2),
+                                     normalize_kernel=True, nan_treatment='fill',
+                                     preserve_nan=True, allow_huge=True)
+    else:
+        # keep the original resolution
+        psf_match_data = hdu[0].data.copy()
+        psf_match_var = var[0].data.copy()
+
+    img_proj, _ = reproject_interp((psf_match_data, wcs), target_wcs,
+                                   shape_out=out_shape)
+    var_proj, _ = reproject_interp((psf_match_var, wcs), target_wcs,
+                                   shape_out=out_shape)
+    if unit == 'flux':
+        img_proj *= (target_pix_scale / pix_scale)**2
+        var_proj *= (target_pix_scale / pix_scale)**2
+
+    out_header = target_wcs.to_header()
+    out_header['FILTER'] = f
+    out_header['MAGZP'] = hdu[0].header.get('MAGZP', -8.9)
+    fits.writeto(out_path / f"{galaxy}_{f}.fits", img_proj, out_header,
+                 overwrite=True)
+    fits.writeto(out_path / f"var_{galaxy}_{f}.fits", var_proj, out_header,
+                 overwrite=True)
+    hdu.close()
+    var.close()
+
+
+def match_image(workdir, galaxy, filters,
                 ref_band='wise_w4', target_wcs=None, ref_band_pixscale=None,
-                flux_or_sb=None, out_shape=None, prefix='match_', out_path=None):
+                flux_or_sb=None, out_shape=None, out_path=None, n_process=None):
     '''
     Match PSF of the images to the target filter.
     Match pixel size of the images to the largest.
 
     Parameters
     ----------
-    img_path : str
-        The path to the images.
-    sci_img: dict
-        The science images.
-    var_img: dict
-        The variance images.
+    workdir : str
+        Path to the working directory.
+    galaxy : str
+        Name of the galaxy to match.
     filters: list
         The list of filters to use for matching.
     ref_band: str
@@ -85,18 +134,17 @@ def match_image(img_path, sci_img, var_img, filters,
         The type of flux to use for matching.
     out_shape: tuple, optional
         The shape of the output images.
-    prefix: str, optional
-        The prefix to add to the output filenames.
     out_path: str, optional
         The path to save the matched images.
+    n_process: int, optional
+        Number of processes to use for matching. Defaults to the number
+        of available CPUs (capped by the number of filters).
     '''
     # handle output directory
+    path = Path(workdir)
     if out_path is None:
-        out_path = f"{img_path}/matched/"
+        out_path = path / "matched"
     out_path = Path(out_path)
-    if not out_path.exists():
-        warnings.warn(f"Creating directory: {out_path}")
-        out_path.mkdir(parents=True)
 
     # handle image units
     if flux_or_sb is None:
@@ -116,8 +164,8 @@ def match_image(img_path, sci_img, var_img, filters,
 
     # set target pixel scale to match
     pix_scales = np.full_like(filters, np.nan, dtype=float)
-    for i, img in enumerate(list(sci_img.values())):
-        pix_scales[i] = get_pixel_size(img_path + img)
+    for i, f in enumerate(filters):
+        pix_scales[i] = get_pixel_size(path / "masked" / f"{galaxy}_{f}.fits")
 
     if ref_band_pixscale is not None:
         target_pix_idx = np.where(np.abs(pix_scales - ref_band_pixscale) < 1e-2)[0][0]
@@ -126,74 +174,40 @@ def match_image(img_path, sci_img, var_img, filters,
         target_pix_scale = np.max(pix_scales[high_res_filt_flg])
         target_pix_idx = np.where(np.abs(pix_scales - target_pix_scale) < 1e-2)[0][0]
 
-    target_hdu = fits.open(img_path + sci_img[filters[target_pix_idx]])
+    target_hdu = fits.open(path / "masked" / f"{galaxy}_{filters[target_pix_idx]}.fits")
     if target_wcs is None:
         target_wcs = WCS(target_hdu[0].header)
 
-    print(f"Matching starts!")
-    print(f"Target PSF = {ref_band}")
-    print(f"Target pixel scales = {target_pix_scale:.3f} arcsec/pixel.")
-    print(f"Output directory: {out_path}")
+    print("Matching starts!")
+    print(f" > Target PSF = {ref_band}")
+    print(f" > Target pixel scales = {target_pix_scale:.3f} arcsec/pixel.")
+    print(f" > Output directory: {out_path}")
 
     # Check for existing matched images
-    if check_output(f"{out_path}/{prefix}{sci_img[filters[0]]}"):
+    if check_output(out_path / f"{galaxy}_{filters[-1]}.fits"):
         return high_res_filt_flg
 
-    # iterate over filters
-    # ------ the main loop ------
-    for i, f in enumerate(filters):
+    if out_shape is None:
+        out_shape = target_hdu[0].data.shape
 
-        print(f"Processing {f}...")
+    if n_process is None:
+        n_process = min(len(filters), os.cpu_count() or 1)
 
-        # open images
-        hdu = fits.open(img_path + sci_img[f])
-        var = fits.open(img_path + var_img[f])
-        wcs = WCS(hdu[0].header)
+    args_list = [
+        (path, galaxy, f, bool(high_res_filt_flg[i]), pix_scales[i], ref_band,
+         target_wcs, target_pix_scale, out_shape, flux_or_sb[f], out_path)
+        for i, f in enumerate(filters)
+    ]
 
-        if high_res_filt_flg[i]:
-
-            # load and crop kernel
-            kernel = load_kernel(f, ref_band, pix_scale=pix_scales[i])
-            kernel = Cutout2D(kernel, position=(kernel.shape[1]//2, 
-                                                kernel.shape[0]//2), 
-                              size=hdu[0].data.shape[0]//2, mode='trim').data
-            # convolve
-            psf_match_data = convolve_fft(hdu[0].data, kernel, 
-                                          normalize_kernel=True, nan_treatment='fill',
-                                          preserve_nan=True, allow_huge=True)
-            psf_match_var = convolve_fft(var[0].data, kernel**2 / np.sum(kernel**2), 
-                                          normalize_kernel=True, nan_treatment='fill',
-                                          preserve_nan=True, allow_huge=True)
-            
-        elif low_res_filt_flg[i]:
-            # keep the original resolution
-            psf_match_data = hdu[0].data.copy()
-            psf_match_var = var[0].data.copy()
-
-        # match pixel size
-        if out_shape is None:
-            out_shape = target_hdu[0].data.shape
-
-        img_proj, _ = reproject_interp((psf_match_data, wcs), target_wcs, 
-                                       shape_out=out_shape)
-        var_proj, _ = reproject_interp((psf_match_var, wcs), target_wcs, 
-                                       shape_out=out_shape)
-        if flux_or_sb[f] == 'flux':
-            img_proj *= (target_pix_scale / pix_scales[i])**2
-            var_proj *= (target_pix_scale / pix_scales[i])**2
-
-        # write output
-        out_header = target_wcs.to_header()
-        out_header['FILTER'] = f
-        out_header['MAGZP'] = hdu[0].header.get('MAGZP', -8.9)
-        fits.writeto(f"{out_path}/{prefix}{sci_img[f]}", img_proj, out_header, 
-                     overwrite=True)
-        fits.writeto(f"{out_path}/{prefix}{var_img[f]}", var_proj, out_header, 
-                     overwrite=True)
-        hdu.close()
-        var.close()
+    with Pool(processes=n_process) as pool:
+        for _ in tqdm(pool.imap(_match_band, args_list), total=len(args_list)):
+            pass
 
     # --- finalize ---
     target_hdu.close()
 
-    return high_res_filt_flg
+    # write the matched filter list
+    np.savetxt(path / "aux" / "filters_highres.txt", 
+               np.array(filters)[high_res_filt_flg], fmt="%s")
+    np.savetxt(path / "aux" / "filters_lowres.txt", 
+               np.array(filters)[low_res_filt_flg], fmt="%s")

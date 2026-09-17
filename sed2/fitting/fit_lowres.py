@@ -1,16 +1,21 @@
+from math import sqrt  # noqa: EXE002
+from pathlib import Path
+
 import numpy as np
-from math import sqrt
 from astropy.io import fits
 from astropy.table import Table
 from multiprocess import Pool
 
+from ..image_process.image_psf import load_kernel
 from ..utils import *
 from .load_sed import BSEDresults
-from ..image_process.image_psf import load_kernel
-from ..path import PATH
 
-__all__ = ["predict_flux_table", "convolve_flux_map", 
-           "predict_flux_map", "new_flux_table"]
+__all__ = [
+    "convolve_flux_map",
+    "new_flux_table",
+    "predict_flux_map",
+    "predict_flux_table",
+]
 
 
 def _process_bin(args):
@@ -40,13 +45,13 @@ def _process_bin(args):
             pred_flux_j[i] = pred_phot[1]
             pred_flux_err_j[i] = sqrt((pred_phot[2] - pred_phot[0])**2 / 4 + (e_cali[i] * pred_flux_j[i])**2)
     
-    # 
     del sed
     return j, pred_flux_j, pred_flux_err_j
 
 
-def predict_flux_table(highres_flux_path, filters, seds=None,
-                       run='_highres', galaxy=None, path_posterior='', manual_prior=None,
+def predict_flux_table(workdir, filters, seds=None,
+                       run='_highres', galaxy=None, 
+                       path_posterior='.', manual_prior=None,
                        out_path=None, prefix='pred_', overwrite=True, n_processes=4):
     '''
     Create flux table involving all filters. 
@@ -77,6 +82,11 @@ def predict_flux_table(highres_flux_path, filters, seds=None,
         Number of processes to use. Defaults to 4.
     '''
     # initialize
+    path = Path(workdir)
+    highres_flux_path = str(path / "flux" / "highres_flux_table.fits")
+    if out_path is None:
+        out_path = path / "flux"
+
     highres_tab = Table.read(highres_flux_path)
     highres_err = Table.read(highres_flux_path.replace(".fits", "_err.fits"))
     n_bin = len(highres_tab)
@@ -130,15 +140,15 @@ def convolve_flux_map(pred_map, pixbin_map, pix_scale=None, out_path=None):
     pred_maps_conv : dict
         Dictionary of convolved predicted flux maps for each low-res filter.
     '''
-    from astropy.nddata import Cutout2D
     from astropy.convolution import convolve_fft
+    from astropy.nddata import Cutout2D
 
     with fits.open(pixbin_map) as hdul:
         header = hdul[0].header
 
     pred_maps_conv = {}
 
-    for f in pred_map.keys():
+    for f in pred_map:
         kernel = load_kernel(header['psfband'], f, pix_scale=pix_scale)
         kernel = Cutout2D(kernel, position=(kernel.shape[1]//2, 
                                             kernel.shape[0]//2), 
@@ -150,12 +160,13 @@ def convolve_flux_map(pred_map, pixbin_map, pix_scale=None, out_path=None):
         pred_var_conv = convolve_fft(pred_map[f][1]**2, kernel**2 / np.sum(kernel**2), 
                                 normalize_kernel=True, nan_treatment='fill',
                                 preserve_nan=True, allow_huge=True)
-        pred_maps_conv[f] = (pred_map_conv, np.sqrt(pred_var_conv))
+        with np.errstate(invalid="ignore"):
+            pred_maps_conv[f] = (pred_map_conv, np.sqrt(pred_var_conv))
 
     # save convolved maps
     if out_path is not None:
-        np.savez(out_path + "pred_map_conv.npz", **pred_maps_conv)
-        return out_path + "pred_map_conv.npz"
+        np.savez(Path(out_path) / "pred_map_conv.npz", **pred_maps_conv)
+        return Path(out_path) / "pred_map_conv.npz"
     else:
         return pred_maps_conv
 
@@ -184,7 +195,7 @@ def predict_flux_map(pred_flux_path, pixbin_map, filters_lowres=None,
     '''
 
     pred_flux_tab = Table.read(pred_flux_path)
-    pred_flux_err = Table.read(pred_flux_path.replace(".fits", "_err.fits"))
+    pred_flux_err = Table.read(Path(str(pred_flux_path).replace(".fits", "_err.fits")))
 
     with fits.open(pixbin_map) as hdul:
         binmap = hdul[0].data.astype(int)
@@ -200,7 +211,7 @@ def predict_flux_map(pred_flux_path, pixbin_map, filters_lowres=None,
         filters_highres = [header[key] for key in list(header.keys()) if key.startswith('FIL')]
         filters_lowres = np.setdiff1d(filters, filters_highres)
 
-    print("Low-res filters:\n", filters_lowres)
+    print("Predicting fluxes in low-res bands:\n", filters_lowres)
 
     # fill predicted maps
     pred_maps = {}
@@ -219,31 +230,24 @@ def predict_flux_map(pred_flux_path, pixbin_map, filters_lowres=None,
 
     # save predicted maps
     if out_path is not None:
-        np.savez(out_path + "pred_map.npz", **pred_maps)
-        return out_path + "pred_map.npz"
+        np.savez(Path(out_path) / "pred_map.npz", **pred_maps)
+        return Path(out_path) / "pred_map.npz"
     else:
         return pred_maps
 
 
 
-def new_flux_table(fluxmap_lowres, pixbin_map, pred_flux_path, 
-                   iteration=1, pix_scale=None, filters_lowres=None,
+def new_flux_table(workdir, iteration=20, 
                    out_file=None, overwrite=True, save_pred_path=None):
     '''
     Create a scaled high-res flux table.
 
     Parameters
     ----------
-    fluxmap_lowres : str
-        Path to the low-res flux map.
-    pixbin_map : str
-        Path to the pixel bin map.
-    pred_flux_path : str
-        Path to the predicted flux table.
+    workdir : str
+        Path to the working directory.
     iteration : int
         Number of iterations for scaling.
-    pix_scale : float
-        Pixel scale of the matching kernel in arcsec/pixel.
     out_file : str
         Path to the output flux table.
     overwrite : bool
@@ -256,34 +260,42 @@ def new_flux_table(fluxmap_lowres, pixbin_map, pred_flux_path,
     pred_map_upd : dict
         Dictionary of updated predicted flux maps for each low-res filter.
     '''
-    from tqdm import tqdm
     from copy import deepcopy
 
-    # load data and initialize
-    pred_map_upd = {}
+    from tqdm import tqdm
 
-    pred_map = predict_flux_map(pred_flux_path, pixbin_map, 
-                                filters_lowres=filters_lowres)
-    if save_pred_path is not None:
-        np.savez(save_pred_path + "pred_map.npz", **pred_map)
+    path = Path(workdir)
+    pred_flux_path = path / "flux" / "pred_flux_table.fits"
+    pixbin_map = path / "flux" / "fluxmap_pixbin.fits"
+    fluxmap_lowres = path / "flux" / "fluxmap_lowres.fits"
 
     pixbin_hdul = fits.open(pixbin_map)
     binmap  = pixbin_hdul[0].data.astype(int)
     bin_ids = binmap.ravel()
     n_bin   = binmap.max()
-
+    
     fluxmap = fits.open(fluxmap_lowres)
     flux_unit = fluxmap[0].header['UNIT']
-    filters_lowres = [fluxmap[0].header[k] for k in fluxmap[0].header if k.startswith('FIL')]
+    pix_scale = fluxmap[0].header['PIXSIZE']
+    f_lowres = [fluxmap[0].header[k] for k in fluxmap[0].header if k.startswith('FIL')]
+
+    # load data and initialize
+    pred_map_upd = {}
+
+    pred_map = predict_flux_map(pred_flux_path, pixbin_map, 
+                                filters_lowres=f_lowres)
+    if save_pred_path is not None:
+        np.savez(save_pred_path / "pred_map.npz", **pred_map)
 
     if pred_flux_path is not None:
         pred_flux = deepcopy(Table.read(pred_flux_path))
-        pred_err  = deepcopy(Table.read(pred_flux_path.replace(".fits", "_err.fits")))
+        pred_err  = deepcopy(Table.read(Path(str(pred_flux_path).replace(".fits", "_err.fits"))))
 
     for n in tqdm(range(iteration)):
-        pred_map_conv = convolve_flux_map(pred_map, pixbin_map, pix_scale=pix_scale)
+        pred_map_conv = convolve_flux_map(pred_map, pixbin_map, 
+                                          pix_scale=pix_scale)
 
-        for i, f in enumerate(filters_lowres[1:]):
+        for i, f in enumerate(f_lowres[1:]):
 
             map_obs = fluxmap[0].data[i+1] * flux_unit
             map_obs[~np.isfinite(map_obs)] = 0
@@ -322,9 +334,9 @@ def new_flux_table(fluxmap_lowres, pixbin_map, pred_flux_path,
 
     if out_file is not None:
         pred_flux.write(out_file, overwrite=overwrite)
-        pred_err.write(out_file.replace(".fits", "_err.fits"), overwrite=overwrite)
+        pred_err.write(Path(str(out_file).replace(".fits", "_err.fits")), overwrite=overwrite)
 
     if save_pred_path is not None:
-        np.savez(save_pred_path + "pred_map_updated.npz", **pred_map_upd)
+        np.savez(save_pred_path / "pred_map_updated.npz", **pred_map_upd)
     else:
         return pred_map_upd

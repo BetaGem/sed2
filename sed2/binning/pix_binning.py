@@ -1,19 +1,27 @@
-import sys
+import sys  # noqa: EXE002
+from pathlib import Path
+
 import numpy as np
 from astropy.io import fits
-from astropy.wcs import WCS
 from scipy.ndimage import binary_dilation
 
 from ..utils import *
-from ..path import PATH
 
-__all__ = ["redchi2_two_seds", "get_neighboring_pixels", "pixel_binning",
-           "plot_binning"]
+__all__ = [
+    "get_bin_flux",
+    "get_neighboring_pixels",
+    "pixel_binning",
+    "plot_binning",
+    "redchi2_two_seds",
+]
 
-def redchi2_two_seds(sed1=[], e_sed1=[], sed2=[], e_sed2=[]):
+def redchi2_two_seds(sed1=None, e_sed1=None, sed2=None, e_sed2=None):
     '''
     Calculate the reduced chi-squared statistic for two SEDs
     '''
+    for s in [sed1, sed2, e_sed1, e_sed2]:
+        if s is None:
+            s = []
     top = np.sum(sed2 * sed1 / (e_sed1**2 + e_sed2**2))
     bottom = np.sum(sed1**2 / (e_sed1**2 + e_sed2**2))
     norm = top / bottom
@@ -53,59 +61,51 @@ def get_neighboring_pixels(arr, dilate_pix):
 
 
 
-def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_limit=4.0, 
-                  r_growth=1, dr_growth=1, grow_percentile=50, out_SNR_factor=1.0, dilate_npixels=100,
-                  connected=True, out_path=None, verbose=False):
+def pixel_binning(workdir, ref_band, 
+                  snr=None, snr_band=None, out_snr_factor=1.0,
+                  Dmin_bin=3.0, r_growth=1, dr_growth=1, 
+                  redc_chi2_limit=4.0, grow_percentile=50, dilate_npixels=100,
+                  connected=True, verbose=False):
     """
     A modified function for pixel binning based on piXedfit.piXedfit_bin (Abdurro'uf et al. 2021)
 
     [https://github.com/aabdurrouf/piXedfit]
 
-    :param fits_fluxmap: str
-        Path of the photometric data cube. The photometric data cube should include 3 hdus:
-        No. Name           Type       Shape            Note
-         0  FLUX           PrimaryHDU (n_band,l,l)  Flux map in each band
-         1  FLUX_ERR       ImageHDU   (n_band,l,l)  Uncertainty map in each band
-         2  GALAXY_REGION  ImageHDU   (l,l)            Mask of region-of-interest
-
-    ref_band : int
-        Index of the reference band (filter) for sorting pixels based on the brightness. The central pixel of a bin is the brightest pixel in this reference band.
-
-    Dmin_bin : int
+    :param workdir: str
+        Path to the working directory containing the necessary input files.
+    :param ref_band: str
+        The reference band (filter) for sorting pixels based on the brightness. The central pixel of a bin is the brightest pixel in this reference band.
+    :param Dmin_bin: int
         Minimum diameter of a bin in unit of pixel.
-
-    SNR : array_like, None
-        S/N thresholds in all bands. The length of this array should be the same as the number of bands in the fits_fluxmap.
-        S/N threshold can vary across the filters. If SNR is None, the S/N is set as 5.0 to all the filters.
-
-    redc_chi2_limit : float
+    :param snr: int, float, array_like, None
+        S/N thresholds in all bands. The length of this array should be the same as the number of bands in snr_band.
+        S/N threshold can vary across the filters. If SNR is None, the S/N is set to 5.0
+    :param snr_band: int, None
+        Index of the band to be used for calculating the S/N. If None, all bands are used.
+    :param redc_chi2_limit: float
         A maximum reduced chi-square value for a pair of two SEDs to be considered as having a similar shape.
-
-    r_growth : int
+    :param r_growth: int
         Increment of pixels in each iteration when growing the bins.
-
-    out_SNR_factor : int
-        The S/N thresholds for the last bin are multiplied by this factor.
-
-    dilate_npixels : int
-        Minimum number of pixels for a bin to be dilated.
-
-    grow_percentile : float, 0 < grow_percentile < 100
+    :param dr_growth: int
+        Increment of pixels in each iteration when growing the bins.
+    :param grow_percentile: float, 0 < grow_percentile < 100
         In each iteration of bin growth, only pixels with flux in the ref_band higher than this percentile will be included.
-
-    connected : bool
+    :param out_snr_factor: int
+        The S/N thresholds for the last bin are multiplied by this factor.
+    :param dilate_npixels: int
+        Minimum number of pixels for a bin to be dilated.
+    :param connected: bool
         If True, pixels in the bin (except the last one) will form a connected region (i.e., no "island")
-
-    name_out_fits : str, None
-        Desired name for the output FITS file. If None, a default name is adopted.
     """
+    path = Path(workdir)
+    fits_fluxmap = path / "flux" / "fluxmap.fits"
 
-    # check outputs
-    if out_path is None:
-        out_path = "%s_pixbin.fits" % fits_fluxmap.split(".fit")[0]
+    out_path = path / "flux" / f"{fits_fluxmap.stem}_pixbin.fits"
+    filters = load_filters_from_txt(path / "aux" / "filter_list.txt")
+    ref_band = filters.index(ref_band) 
 
     if check_output(out_path): 
-        return out_path
+        return 
 
     # load data
     hdu = fits.open(fits_fluxmap)
@@ -158,15 +158,23 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
         print("Please provide the correct reference band index!")
         sys.exit()
 
-    if SNR is None:
-        SN_threshold = np.zeros(n_band) + 5.0
-    elif len(SNR) != n_band:
-        print (f"Number of elements in SNR should be the same as the number of filters, which is {n_band}.")
-        sys.exit()
+    if snr_band is not None:
+        filter_ids = load_filter_ids(workdir, snr_band)
     else:
-        SN_threshold = np.asarray(SNR)
-        idx0 = np.where(SNR == 0)
-        SN_threshold[idx0[0]] = -1.0e+5     # replace zero SNR with negative value
+        filter_ids = np.arange(n_band)
+
+    snr_thresh = np.zeros(n_band)
+    if snr is None:
+        snr_thresh[filter_ids] = 5.0
+    elif isinstance(snr, (int, float)):
+        snr_thresh[filter_ids] = snr
+    elif isinstance(snr, (list, np.ndarray)):
+        if len(snr) == len(filter_ids):
+            snr_thresh[filter_ids] = np.asarray(snr)
+        else:
+            raise ValueError(f"The length of SNR array: {len(snr)} should be\
+                              the same as the number of filters: {len(filter_ids)}.")
+    snr_thresh[snr_thresh <= 0] = -1e+5
 
     # shape of the image
     dim_y = gal_region.shape[0]
@@ -183,7 +191,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     # ----- the main loop -----
     
     count_bin = 0                         # number of bins finished
-    cumul_npixs_in_bin = 0                 # number of pixels finished
+    cumul_npixs_in_bin = 0                # number of pixels finished
     
     while len(rows) > 0:
         # central pixel of this bin
@@ -199,10 +207,10 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
         ymin = int(bin_y_cent - del_dim)
         ymax = int(bin_y_cent + del_dim)
 
-        if xmin < 0: xmin = 0
+        xmin = max(xmin, 0)
         if xmax >= dim_x: xmax = dim_x - 1
 
-        if ymin < 0: ymin = 0
+        ymin = max(ymin, 0)
         if ymax >= dim_y: ymax = dim_y - 1
 
         x = np.linspace(xmin, xmax, xmax - xmin + 1)
@@ -224,7 +232,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
         tot_bin_flux_err2 = np.sum(np.square(map_flux_err_trans[rows1, cols1]), axis=0)
 
         tot_SNR = np.nan_to_num(tot_bin_flux / np.sqrt(tot_bin_flux_err2))  # SNR for all bands
-        idx0 = np.where(tot_SNR >= SN_threshold)             # bands that achieve the SNR limit
+        idx0 = np.where(tot_SNR >= snr_thresh)             # bands that achieve the SNR limit
 
         if len(idx0[0]) == n_band:                           # if SNR is satisfied in all bands
             # get bin
@@ -253,8 +261,14 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                 rows1, cols1 = np.where(neighbor_pix & (gal_region==1) & (pixbin_map==0))
 
                 # select the bright half of these pixels (bright & within RoI & not occupied by other bins)
-                pix_select = (map_flux[ref_band] > np.nanpercentile(map_flux[ref_band][rows1, cols1], grow_percentile)) &\
+                if len(rows1):
+                    bright_lim = np.nanpercentile(map_flux[ref_band][rows1, cols1], 
+                                                  grow_percentile)
+                else:
+                    bright_lim = -np.inf
+                pix_select = (map_flux[ref_band] > bright_lim) &\
                       (gal_region==1) & (pixbin_map==0)
+                
                 if connected:
                     rows1, cols1 = np.where(pix_select & neighbor_pix)
                 else:
@@ -270,7 +284,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
 
                 top0 = np.nansum(map_flux_trans[rows1, cols1] * cent_pix_SED_flux[rows1, cols1] / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
                 bottom0 = np.nansum(np.square(cent_pix_SED_flux[rows1, cols1]) / (np.square(map_flux_err_corr_trans[rows1, cols1]) + np.square(cent_pix_SED_flux_err[rows1, cols1])), axis=1)
-                for i in range(0,n_band):
+                for i in range(n_band):
                     norm0[i][rows1, cols1] = top0 / bottom0
                 # transpose from (band,y,x) -> (y,x,band)
                 norm0_trans = np.transpose(norm0, axes=(1,2,0))
@@ -293,7 +307,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                 tot_bin_flux_err2 = tot_bin_flux_err2 + np.sum(np.square(map_flux_err_trans[rows1_cut, cols1_cut]), axis=0)
 
                 tot_SNR = np.nan_to_num(tot_bin_flux / np.sqrt(tot_bin_flux_err2))
-                idx0 = np.where(tot_SNR >= SN_threshold)
+                idx0 = np.where(tot_SNR >= snr_thresh)
 
                 if len(idx0[0]) == n_band:    # if SNR is high enough
                     # get bin
@@ -310,7 +324,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
                     tflux = np.sum(map_flux_trans[rows_rest, cols_rest], axis=0)
                     tflux_err2 = np.sum(np.square(map_flux_err_trans[rows_rest, cols_rest]), axis=0)
                     tSNR = np.nan_to_num(tflux / np.sqrt(tflux_err2))
-                    tidx = np.where(tSNR >= SN_threshold * out_SNR_factor)
+                    tidx = np.where(tSNR >= snr_thresh * out_snr_factor)
 
                     # if SNR is not high enough even if adding all remaining pixels
                     if len(tidx[0]) < n_band or r_growth > np.sqrt(np.sum(gal_region) / np.pi):   
@@ -370,6 +384,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
         pixbin_map[(this_bin_map > 0) & (pixbin_map > i)] = i
 
     # remove empty bins
+    print("Removing empty bins ...")
     pixbin_map_clean = np.full((dim_y, dim_x), 0)
     for n, i in enumerate(np.unique(pixbin_map)): 
         pixbin_map_clean[pixbin_map == i] = n
@@ -389,7 +404,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     map_bin_flux_trans = np.transpose(map_bin_flux, axes=(2,0,1))
     map_bin_flux_err_trans = np.transpose(map_bin_flux_err, axes=(2,0,1))
 
-    print ("Number of bins: %d" % count_bin)
+    print (f"Number of bins: {count_bin}")
 
     ## store into FITS file
     hdul = fits.HDUList()
@@ -417,7 +432,7 @@ def pixel_binning(fits_fluxmap, ref_band=0, Dmin_bin=4.0, SNR=None, redc_chi2_li
     return out_path
 
 
-def plot_binning(pixbin_path, show_idx=True, 
+def plot_binning(workdir, show_idx=True, 
                  xlim=None, ylim=None, vmin=0, out_path=None):
     '''
     Plot the pixel binning map.
@@ -429,13 +444,13 @@ def plot_binning(pixbin_path, show_idx=True,
     '''
     import matplotlib.pyplot as plt
 
-    with fits.open(pixbin_path) as hdu:
+    with fits.open(workdir / "flux" / "fluxmap_pixbin.fits") as hdu:
         bin_map = hdu['bin_map'].data.copy()
         n_bin = int(np.max(bin_map))
 
-    bin_map[bin_map == np.max(bin_map)] += 5  # for illustration
+    bin_map[bin_map == np.max(bin_map)] += 5  # for illustration only
 
-    plt.figure(figsize=(7,5))
+    plt.figure(figsize=(7, 5))
     plt.imshow(bin_map, cmap='nipy_spectral_r', origin='lower', vmin=vmin)
     plt.colorbar(label='Bin Index')
     plt.title('Pixel Binning Map')
@@ -451,29 +466,29 @@ def plot_binning(pixbin_path, show_idx=True,
                      np.mean(np.where(bin_map == i + 1)[0])-.5,
                      i, c='w', fontsize=8)
             
-    if out_path is not None: plt.savefig(out_path)
+    if out_path is not None: 
+        plt.savefig(out_path)
+    else:
+        plt.show()
 
-    plt.show()
 
-
-
-def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=True):
+def get_bin_flux(workdir, galaxy, fluxmap_path=None,
+                 bootstrap=100, plot_sed=True, out_path=None):
     '''
     Get the flux values and uncertainties for each bin from the flux map.
 
     Parameters
     ----------
-    pixbin_path : str
-        The file path to the pixel binning map.
+    workdir : str
+        The working directory containing the pixel binning results.
     fluxmap_path : str
-        The file path to the flux map.
-    img_paths : list
-        A list of file paths to the science images.
+        The file path to the flux map FITS file.
     bootstrap : int
         The number of bootstrap samples to use for uncertainty estimation.
     plot_sed : bool
         Whether to plot the SED for each bin.
-
+    out_path : str
+        The file path to save the flux tables.
     Returns
     -------
     bin_flux : list
@@ -482,15 +497,18 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
         A list of flux uncertainties for each bin.
     '''
     from tqdm import tqdm
-    # from scipy.interpolate import CubicSpline
+    path = Path(workdir)
 
     # load binning data
-    hdu = fits.open(pixbin_path)
+    hdu = fits.open(path / "flux" / "fluxmap_pixbin.fits")
     binmap  = hdu['bin_map'].data
     fluxmap = hdu['bin_flux'].data
     fluxmap_err = hdu['bin_fluxerr'].data
     n_bin = int(np.max(binmap))
-    filters_all = [hdu[0].header[k] for k in hdu[0].header.keys() if k.startswith('FIL')]
+    filters_all = [hdu[0].header[k] for k in hdu[0].header if k.startswith('FIL')]
+
+    if fluxmap_path is None:
+        fluxmap_path = path / "flux" / "fluxmap.fits"
 
     fits_fluxmap = fits.open(fluxmap_path)
     unit_flux = float(fits_fluxmap[0].header['UNIT'])
@@ -550,7 +568,7 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
     print("Calculating background sampling error ...")
     for i in tqdm(range(n_band)): 
 
-        img = fits.open(img_paths[i])[0].data
+        img = fits.open(path / "matched" / f"{galaxy}_{filters[i]}.fits")[0].data
 
         # flux conversion unit
         bin_ = binmap == 1
@@ -609,6 +627,13 @@ def get_bin_flux(pixbin_path, fluxmap_path, img_paths, bootstrap=100, plot_sed=T
         plt.yscale('log')
         plt.xlabel(r"$\lambda~(\mathrm{\mu m})$")
         plt.ylabel(r"$\lambda f_\lambda~\mathrm{(erg/s/cm^2)}$")
-        plt.show()
+        plt.savefig(path / "plot" / f"{galaxy}_sed_sample.png", dpi=300)
+        plt.close()
+
+    if out_path is None:
+        out_path = path / "flux" 
+
+    save_flux(bin_flux, bin_flux_err, filters, out_path,
+              prefix="highres_")
 
     return bin_flux, bin_flux_err

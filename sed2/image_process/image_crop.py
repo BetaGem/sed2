@@ -1,18 +1,23 @@
+import os
+from pathlib import Path
+
 import numpy as np
 from astropy.io import fits
-from astropy.wcs import WCS
-from astropy.coordinates import SkyCoord
 from astropy.nddata import Cutout2D
+from astropy.wcs import WCS
+from multiprocess import Pool
+from tqdm import tqdm
 
 from ..utils import *
-from sed2.path import PATH
 
-__all__ = ["remove_naninf_image_2dinterpolation",
-           "remove_naninf_image_fill",
-           "crop"]
+__all__ = [
+    "crop",
+    "remove_naninf_image_2dinter",
+    "remove_naninf_image_fill",
+]
 
 
-def remove_naninf_image_2dinterpolation(data_image):
+def remove_naninf_image_2dinter(data_image):
     '''
     Interpolate over NaN and Inf values in a 2D image.
     This function is adopted from piXedfit.piXedfit_images 
@@ -56,101 +61,89 @@ def remove_naninf_image_fill(data_image, fill_value=0):
     
 
 
-def crop(img_path, sci_img, var_img, filters, robust=False,
-         galaxy=None, crop_size=None,
-         ra=None, dec=None, crop_path=None):
+def _crop_band(args):
+    '''Crop a single band (worker for multiprocessing).'''
+    path, crop_path, galaxy, f, sci_file, var_file, ra, dec, pix_scale, crop_size = args
+
+    dim_y0, dim_x0 = crop_size
+    dim_y1 = int(dim_y0 / pix_scale)
+    dim_x1 = int(dim_x0 / pix_scale)
+
+    # science image
+    hdu = fits.open(path / "image" / sci_file)[0]
+    wcs = WCS(hdu.header)
+    position = wcs.wcs_world2pix(ra, dec, 1)
+    cutout = Cutout2D(hdu.data, wcs=wcs, position=position,
+                      size=(dim_y1, dim_x1))
+    header = cutout.wcs.to_header()
+
+    # copy relevant header keywords
+    for key in hdu.header:
+        if 'MAGZP' in key:
+            header['MAGZP'] = hdu.header[key]
+
+    fits.writeto(crop_path / f"crop_{galaxy}_{f}.fits",
+                 cutout.data, header, overwrite=True)
+
+    # variance image
+    hdu = fits.open(path / "image" / var_file)[0]
+    wcs = WCS(hdu.header)
+    position = wcs.wcs_world2pix(ra, dec, 1)
+    cutout = Cutout2D(hdu.data, wcs=wcs, position=position,
+                      size=(dim_y1, dim_x1))
+    fits.writeto(crop_path / f"crop_var_{galaxy}_{f}.fits",
+                 cutout.data, header, overwrite=True)
+
+
+def crop(workdir, filters, coord, crop_size,
+         galaxy='galaxy', n_process=None):
     '''
     This function is adopted from piXedfit.piXedfit_images 
     (Abdurro'uf et al. 2021)
 
     Parameters
     ----------
-    img_path : str
-        Path to the image directory.
-    sci_img : dict
-        Dictionary of science images.
-    var_img : dict
-        Dictionary of variance images.
+    workdir : str
+        Path to the working directory.
     filters : list
         List of filters to apply.
-    robust : bool, optional
-        Whether to fill NaN/Inf values.
     galaxy : str, optional
         Name of the galaxy to crop around.
     crop_size : tuple, optional
-        Size of the crop (height, width).
-    ra : float, optional
-        Right ascension of the center of the crop.
-    dec : float, optional
-        Declination of the center of the crop.
-    crop_path : str, optional
-        Path to the output directory for cropped images.
+        Size of the crop (height, width) in arcsec.
+    coord : astropy.coordinates.SkyCoord
+        SkyCoord object representing the coordinates of the galaxy.
+    n_process : int, optional
+        Number of processes to use for cropping. Defaults to the number
+        of available CPUs (capped by the number of filters).
     '''
+    path = Path(workdir)
+    crop_path = path / "cropped"
+
+    sci_img = {f: f"skybgsub_{galaxy}_{f}.fits" for f in filters}
+    var_img = {f: f"var_{galaxy}_{f}.fits" for f in filters}
+    ra, dec = coord.ra.value, coord.dec.value
 
     # get band with the largest pixel size
-    pix_scales = np.full_like(filters, np.nan, dtype=float)
-    for i, img in enumerate(list(sci_img.values())):
-        pix_scales[i] = get_pixel_size(img_path + img)
-
-    target_pix_scale = np.max(pix_scales)
-    # target_pix_idx = np.where(np.abs(pix_scales - target_pix_scale) < 1e-2)[0][0]
-    
-    # load geometry
-    if galaxy is not None:
-        try:
-            coord = SkyCoord.from_name(galaxy)
-            ra, dec = coord.ra.value, coord.dec.value
-        except:
-            if ra is None or dec is None:
-                raise ValueError(f"Failed to resolve {galaxy}, RA and DEC should be specified.")
-        crop_size = load_ref_info(galaxy)[2]
+    pix_scales = {}
+    for f in filters:
+        pix_scales[f] = get_pixel_size(path / "image" / sci_img[f])
 
     if isinstance(crop_size, int):
           crop_size = (crop_size, crop_size)
 
-    # create output directory
-    if crop_path is None:
-        import os
-        from pathlib import Path
-
-        crop_path = Path(img_path).parent / "cropped"
-        os.makedirs(crop_path, exist_ok=True)
-
     # whether to overwrite existing crops
-    if check_output(crop_path / f"crop_{sci_img[filters[-1]]}"):
+    if check_output(crop_path / f"crop_{galaxy}_{filters[-1]}.fits"):
         return crop_path
 
-    print("Cropping starts!")
+    print("Cropping starts! Crop size: ", crop_size, "arcsec")
 
-    for i in range(len(filters)):
+    if n_process is None:
+        n_process = min(len(filters), os.cpu_count() or 1)
 
-        print(f"Processing {filters[i]}...")
+    args_list = [(path, crop_path, galaxy, f, sci_img[f], var_img[f],
+                  ra, dec, pix_scales[f], crop_size) for f in filters]
 
-        dim_y0, dim_x0 = crop_size
-        dim_y1 = int(dim_y0 * target_pix_scale / pix_scales[i] * 1.5)
-        dim_x1 = int(dim_x0 * target_pix_scale / pix_scales[i] * 1.5)
-
-        # science image
-        hdu = fits.open(img_path + sci_img[filters[i]])[0]
-        wcs = WCS(hdu.header)
-        position = wcs.wcs_world2pix(ra, dec, 1)
-        cutout = Cutout2D(hdu.data, position=position, 
-                          size=(dim_y1, dim_x1), wcs=wcs)
-        header = cutout.wcs.to_header()
-        
-        # copy relevant header keywords
-        for key in hdu.header.keys():
-            if 'MAGZP' in key:
-                header['MAGZP'] = hdu.header[key]
-
-        fits.writeto(f"{crop_path}/crop_{sci_img[filters[i]]}", 
-                     cutout.data, header, overwrite=True)
-
-        # variance image
-        hdu = fits.open(img_path + var_img[filters[i]])[0]
-        wcs = WCS(hdu.header)
-        position = wcs.wcs_world2pix(ra, dec, 1)
-        cutout = Cutout2D(hdu.data, position=position, 
-                          size=(dim_y1, dim_x1), wcs=wcs)
-        fits.writeto(f"{crop_path}/crop_{var_img[filters[i]]}", 
-                     cutout.data, header, overwrite=True)
+    with Pool(processes=n_process) as pool:
+        for _ in tqdm(pool.imap(_crop_band, args_list), total=len(args_list)):
+            pass

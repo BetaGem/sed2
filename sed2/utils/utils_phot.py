@@ -1,4 +1,6 @@
-import numpy as np  # noqa: EXE002
+from pathlib import Path  # noqa: EXE002
+
+import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -204,22 +206,23 @@ def save_flux(bin_flux, bin_flux_err, filters,
 
     n_bin = bin_flux.shape[0]
 
-    if not os.path.exists(out_path):
-        os.makedirs(out_path)
+    path = Path(out_path)
+    if not os.path.exists(path):
+        os.makedirs(path)
 
-    if check_output(out_path + f'{prefix}flux_table.fits'):
+    if check_output(Path(path) / f'{prefix}flux_table.fits'):
         return 0 
 
     flux_table = Table(data=np.hstack((np.indices((n_bin, 1))[0], bin_flux)), 
                        names=np.hstack((['bin_id'], filters)), 
                        dtype=np.hstack(([np.int16], [float]*len(filters))))
     
-    flux_table.write(out_path + f'{prefix}flux_table.fits', 
+    flux_table.write(path / f'{prefix}flux_table.fits', 
                      overwrite=overwrite)
 
     elux_table = Table(data=np.hstack((np.indices((n_bin, 1))[0], bin_flux_err)), 
                        names=np.hstack((['bin_id'], filters)), 
                        dtype=np.hstack(([np.int16], [float]*len(filters))))
     
-    elux_table.write(out_path + f'{prefix}flux_table_err.fits', 
+    elux_table.write(path / f'{prefix}flux_table_err.fits', 
                      overwrite=overwrite)

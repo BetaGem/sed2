@@ -34,8 +34,9 @@ build/
 
 # Common data folders
 data/
-raw_data/
 downloads/
+params/
+kernels/
 
 # caches / test outputs
 .pytest_cache/

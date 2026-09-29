@@ -7,7 +7,7 @@
 # ---------------------------------------------------------
 galaxy          NGC0628     # Galaxy name (e.g., NGC0628)
 workdir        /home/pku/Astro/sed2/demo/data      # Working directory
-steps           bin       # Pipeline steps to run (bkg, crop, mask, psf, roi, bin, fit, 2pass)
+steps           mask, imask       # Pipeline steps to run (bkg, crop, mask, imask, psf, roi, bin, fit, 2pass)
 n_process       8           # Number of parallel processes
 verbose         True        # Verbose output
 
@@ -39,6 +39,14 @@ mask_in_thresh  1.5         # Inner-mask detection threshold
 mask_in_dilate  1.5         # Inner-mask dilation (in FWHM)
 mask_out_thresh 3.0         # Outer source-detection nsigma threshold
 mask_clean      True        # Remove regions connected to the central mask
+
+# ---------------------------------------------------------
+# Interactive masking (optional, requires a display)
+# ---------------------------------------------------------
+imask_image     masked      # Image to draw on: masked (auto-masked), cropped or image
+imask_band      None        # Single band to mask (None = every band)
+imask_overwrite False       # Redraw bands that already have a circular mask
+imask_apply     True        # Re-run masking for a band once its circles are saved
 
 # ---------------------------------------------------------
 # PSF matching

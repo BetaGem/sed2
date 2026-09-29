@@ -139,6 +139,27 @@ def run(par_file=None):
                         filters=params["filters"],
                         coord=params["coord"])
 
+        # --- interactive masking (requires a display) ----
+        elif step == "imask":
+            print(f"\n>>> Interactive masking [{galaxy}]")
+            from .image_process.interact_mask import interactive_mask
+            mask_kwargs = {
+                "bkg_ref_band": params["bkg_ref_band"],
+                "crop_size": params.get("mask_box", 3),
+                "crop_size_large": params.get("mask_box_large", 6),
+                "thresh": params.get("mask_in_thresh", 1.5),
+                "dilate": params.get("mask_in_dilate", 1.5),
+                "thresh_out": params.get("mask_out_thresh", 3.0),
+                "clean": params.get("mask_clean", True),
+            }
+            interactive_mask(workdir, galaxy,
+                             filters=params["filters"],
+                             image_type=params.get("imask_image", "masked"),
+                             ref_band=params.get("imask_band", None),
+                             overwrite=params.get("imask_overwrite", False),
+                             apply=params.get("imask_apply", True),
+                             mask_kwargs=mask_kwargs)
+
         # --- source masking ----
         elif step == "mask":
             print(f"\n>>> Source masking [{galaxy}]")

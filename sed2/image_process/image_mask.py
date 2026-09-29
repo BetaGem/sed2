@@ -628,3 +628,4 @@ def do_mask(workdir, galaxy, band, bkg_ref_band,
         plt.colorbar()
         plt.tight_layout()
         plt.savefig(path / "plot" / f"mask_{galaxy}_{band}.png", dpi=300)
+        plt.close()

@@ -14,8 +14,43 @@ __all__ = [
     "get_a_b_ellipse",
     "get_ebv",
     "get_pixel_size",
+    "reproject_mask",
     "save_flux",
 ]
+
+
+def reproject_mask(mask, wcs_in, wcs_out, out_shape, order=1, cval=0.0,
+                   block_size=256):
+    '''
+    Reproject a mask onto ``wcs_out`` one block of rows at a time.
+
+    ``reproject_interp`` allocates several full-size float64 arrays, which is
+    very memory hungry when a coarse mask is resampled onto a large, finely
+    sampled image. Sampling the output in row blocks keeps the peak memory
+    close to the size of the output instead.
+    '''
+    from scipy.ndimage import map_coordinates
+
+    mask = np.asarray(mask, dtype=np.float32)
+    ny, nx = out_shape
+    out = np.zeros((ny, nx), dtype=np.float32)
+    
+    for y0 in range(0, ny, block_size):
+        y1 = min(y0 + block_size, ny)
+        yy, xx = np.mgrid[y0:y1, 0:nx]
+        sky = wcs_out.pixel_to_world(xx, yy)
+        x_in, y_in = wcs_in.world_to_pixel(sky)
+        x_in = np.asarray(x_in, dtype=np.float64).ravel()
+        y_in = np.asarray(y_in, dtype=np.float64).ravel()
+        bad = ~np.isfinite(x_in) | ~np.isfinite(y_in)
+        x_in[bad] = -1.0
+        y_in[bad] = -1.0
+        vals = map_coordinates(mask, [y_in, x_in], order=order,
+                               mode="constant", cval=cval)
+        out[y0:y1] = vals.reshape(y1 - y0, nx)
+
+    return out
+
 
 def get_pixel_size(img_path):
     '''

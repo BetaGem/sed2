@@ -1,17 +1,18 @@
 import multiprocessing as mp
 import os
 import subprocess
+from copy import deepcopy
 from pathlib import Path
 
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
 from astropy.table import Table, vstack
 from astropy.wcs import WCS
 from photutils.background import Background2D
 from photutils.segmentation import deblend_sources, detect_sources, detect_threshold
-from reproject import reproject_interp
 from scipy import ndimage
 
 from .. import utils
@@ -347,8 +348,8 @@ def get_catalogs(workdir, galaxy, bkg_ref_band, coord,
     ref_hdu = fits.open(path / "cropped" / f"crop_{galaxy}_{bkg_ref_band}.fits")[0]
     ref_wcs = WCS(ref_hdu.header)
     seg_center = fits.open(path / "image" / "ref_mask_inner.fits")[0]
-    seg_center = reproject_interp((seg_center.data, WCS(seg_center.header)), ref_hdu.header,
-                                  return_footprint=False)
+    seg_center = utils.reproject_mask(seg_center.data, WCS(seg_center.header),
+                                      ref_wcs, ref_hdu.data.shape, cval=np.nan)
     
     # get desi catalogs
     center_pix = np.where(seg_center > 0)
@@ -391,7 +392,7 @@ def mask_one_band_inner(workdir, galaxy, band, cstars, csources,
     cur_hdu = fits.open(cur_img)
     cur_wcs = WCS(cur_hdu[0].header)
     
-    mask = np.full(cur_hdu[0].data.shape, 0)
+    mask = np.zeros(cur_hdu[0].data.shape, dtype=bool)
     
     for i in range(len(cstars) + len(csources)):
         # source center
@@ -415,28 +416,57 @@ def mask_one_band_inner(workdir, galaxy, band, cstars, csources,
         #     size = crop_size_large
         
         crop_radius = int(size * fwhm)
-        crop = cur_hdu[0].data[cy - crop_radius: cy + crop_radius + 1,
-                               cx - crop_radius: cx + crop_radius + 1]
+        y0, x0 = cy - crop_radius, cx - crop_radius
+        crop = cur_hdu[0].data[y0: y0 + 2 * crop_radius + 1,
+                               x0: x0 + 2 * crop_radius + 1]
+        # actual source position inside the (possibly truncated) crop
+        cyc, cxc = cy - y0, cx - x0
         if "wise" not in band:         # wise images are already smoothed enough ......
-            crop = ndimage.gaussian_filter(crop, fwhm / 2.235)
-        try:
-            crop_bkg = Background2D(crop, box_size=crop_radius*2, exclude_percentile=99)
-        except ValueError: 
+            crop = ndimage.gaussian_filter(crop, fwhm / 2.355)
+
+        # estimate the local background from an annulus around the source,
+        # excluding the inner region that contains the source itself
+        yy, xx = np.mgrid[0:crop.shape[0], 0:crop.shape[1]]
+        dist = np.hypot(yy - cyc, xx - cxc)
+        r_in = max(crop_radius // 2, 1)
+        annulus = (dist >= r_in) & np.isfinite(crop)
+        if annulus.sum() < 10:         # too few pixels: fall back to the whole crop
+            annulus = np.isfinite(crop)
+        if annulus.sum() == 0:
             continue
-        back_median, back_std = crop_bkg.background_median, crop_bkg.background_rms_median
+        _, back_median, back_std = sigma_clipped_stats(crop[annulus],
+                                                       sigma=3.0, maxiters=5)
         
         if cur_hdu[0].data[cy, cx] < back_median + back_std * thresh:
             continue
         else: 
             # mask central segment
-            crop_mask = crop > back_median + back_std * thresh
-            crop_mask_label, _ = ndimage.label(crop_mask)
-            crop_mask[crop_mask_label != crop_mask_label[crop_radius][crop_radius]] = 0
-            mask[cy - crop_radius: cy + crop_radius + 1,
-                 cx - crop_radius: cx + crop_radius + 1] = crop_mask
+            _thresh = deepcopy(thresh)
+            _dilate = deepcopy(dilate)
 
-    if dilate > 0:
-        mask = ndimage.binary_dilation(mask, iterations=int(fwhm * dilate) )
+            if back_std <= 0 or not np.isfinite(back_std):
+                continue
+
+            for _ in range(10):
+                crop_mask = crop > back_median + back_std * _thresh
+                crop_mask_label, _ = ndimage.label(crop_mask)
+                crop_mask[crop_mask_label != crop_mask_label[cyc, cxc]] = 0
+                # if crop mask touches the edge of the crop region ...
+                if np.any(crop_mask[0, :] | crop_mask[-1, :] | crop_mask[:, 0] | crop_mask[:, -1]):
+                    _thresh += 0.5
+                    _dilate += 0.5
+                else:
+                    break
+
+            if dilate > 0:
+                radius = int(fwhm * _dilate)
+                if radius > 0:
+                    # isotropic (circular) dilation instead of an iterated cross
+                    dy, dx = np.ogrid[-radius: radius + 1, -radius: radius + 1]
+                    disk = (dx**2 + dy**2) <= radius**2
+                    crop_mask = ndimage.binary_dilation(crop_mask, structure=disk)
+            mask[cy - crop_radius: cy + crop_radius + 1,
+                 cx - crop_radius: cx + crop_radius + 1] |= crop_mask
 
     return mask
 
@@ -496,14 +526,27 @@ def interp_image(cur_hdu, mask, region_in, box_size=3):
     '''
     fill the mask with interpolation and noise
     '''
-    # inner mask has mask_type == 2
-    mask_type = mask.astype(int) * ((region_in > 0.5).astype(int) + 1) 
+    # make sure the mask is boolean: a non-boolean array makes ``~mask`` a
+    # bitwise NOT, which turns the fancy indexing below into an integer index
+    # (exploding memory).
+    mask = np.asarray(mask).astype(bool)
+    inner = region_in > 0.5
 
-    img_clean  = cur_hdu.data.copy()
+    # boolean regions instead of an int mask_type: much smaller temporaries
+    mask_inner = mask & inner          # interpolate from the background
+    mask_outer = mask & (~inner)       # fill with noise
+
+    # native float32 (big-endian FITS data would otherwise be up-cast)
+    img_clean = cur_hdu.data.astype(np.float32, copy=True)
+
     # fill outer mask with noise
-    rms = (np.nanpercentile(img_clean[(region_in == 0) & (~mask)], 84) - \
-            np.nanpercentile(img_clean[(region_in == 0) & (~mask)], 16)) / 2
-    img_clean[mask_type == 1] = np.random.randn(np.sum(mask_type == 1)) * rms
+    unmasked = (~mask) & (region_in == 0)
+    rms = (np.nanpercentile(img_clean[unmasked], 84) -
+           np.nanpercentile(img_clean[unmasked], 16)) / 2
+    n_outer = int(mask_outer.sum())
+    if n_outer:
+        img_clean[mask_outer] = np.random.randn(n_outer).astype(np.float32) * rms
+    del unmasked
     # interpolate inner masks
     img_interp = Background2D(img_clean,
                               box_size=box_size,
@@ -512,7 +555,7 @@ def interp_image(cur_hdu, mask, region_in, box_size=3):
                               coverage_mask=np.isnan(img_clean) & (~mask),
                               exclude_percentile=50,
                              )
-    img_clean[mask_type == 2] = img_interp.background[mask_type == 2]
+    img_clean[mask_inner] = img_interp.background[mask_inner]
     return img_clean
 
 
@@ -540,7 +583,8 @@ def do_mask(workdir, galaxy, band, bkg_ref_band,
     ref_wcs = WCS(ref_img.header)
     cur_wcs = WCS(cur_img.header)
 
-    seg_cen_proj = reproject_interp((seg_center, ref_wcs), cur_wcs, return_footprint=False)
+    seg_cen_proj = utils.reproject_mask(seg_center, ref_wcs, cur_wcs,
+                                        cur_img.data.shape, cval=np.nan)
 
     psf_asec = utils.get_psf_size(band)
     pix_asec = utils.get_pixel_size(path / "cropped" / f"crop_{galaxy}_{band}.fits")

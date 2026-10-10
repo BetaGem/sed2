@@ -10,7 +10,6 @@ from astropy.utils.exceptions import AstropyWarning
 from astropy.wcs import WCS
 from photutils.background import Background2D, MeanBackground, SExtractorBackground
 from photutils.segmentation import detect_sources, detect_threshold
-from reproject import reproject_interp
 from scipy import ndimage
 from scipy.optimize import curve_fit
 
@@ -32,8 +31,10 @@ def fit_gaussian_for_image(data, model_percent=95, verbose=True):
     bins = (bin[:-1] + bin[1:]) / 2
     
     popt, pcov = curve_fit(Gaussian, bins, hist, 
-                           p0=[np.nanmax(hist), bins[np.argmax(hist)], sigma_clipped_stats(data_flat)[2]], 
-                           bounds=([np.nanmax(hist)/2, -np.inf, 0], [np.nanmax(hist)*2, np.inf, np.inf]))
+                           p0=[np.nanmax(hist), bins[np.argmax(hist)], 
+                               sigma_clipped_stats(data_flat)[2]], 
+                           bounds=([np.nanmax(hist)/2, -np.inf, 0], 
+                                   [np.nanmax(hist)*2, np.inf, np.inf]))
     # if verbose:
     #     plt.scatter(bins, hist, c='k')
     #     plt.plot(_x:=np.linspace(bins[0], bins[-1], num=100), Gaussian(_x, *popt), 'r--')
@@ -42,15 +43,27 @@ def fit_gaussian_for_image(data, model_percent=95, verbose=True):
     return popt, pcov
 
 
-def mask_reproject(ref_mask, header):
+def mask_reproject(ref_mask, header, out_shape=None):
     '''
     project the mask in reference band to WCS(header)
     '''
-    arr, _ = reproject_interp(ref_mask, WCS(header))
-    arr[arr > 0.5] = 1
+    from .. import utils
+
+    out_wcs = WCS(header)
+    if out_shape is None:
+        out_shape = out_wcs.array_shape
+
+    # ref_mask can be a FITS file (path) or an (array, wcs) pair
+    if isinstance(ref_mask, (str, bytes, Path)) or hasattr(ref_mask, "__fspath__"):
+        with fits.open(ref_mask) as hdul:
+            in_data, in_wcs = hdul[0].data, WCS(hdul[0].header)
+    else:
+        in_data, in_wcs = ref_mask
+
+    arr = utils.reproject_mask(in_data, in_wcs, out_wcs, out_shape, order=1)
     arr[~np.isfinite(arr)] = 0
-    
-    return arr.astype(int)
+
+    return (arr > 0.5).astype(int)
 
 
 def dilate(radius_idx, maskim, psf_px):
@@ -122,7 +135,8 @@ def reference_mask(workdir, fits_image, type="image", name_out_mask=None,
 
     if name_out_mask is None:
         name_out_mask = path / "aux" / "ref_mask.fits"
-    fits.writeto(name_out_mask, mask.astype(np.int8), hdu.header, overwrite=True)
+    fits.writeto(name_out_mask, mask.astype(np.int8), 
+                 hdu.header, overwrite=True)
 
     plt.figure(figsize=(4, 4))
     plt.imshow(hdu.data, vmax=np.nanpercentile(hdu.data, 95), origin='lower')
@@ -173,9 +187,10 @@ def subtract_background(workdir, fits_image, hdu_idx=0, sigma=3.0,
     if mask_ref is None:
         mask_region1 = mask_region0
     else:
-        mask_region = mask_reproject(mask_ref, header)
-        if mask_region.shape[0]!=dim_y or mask_region.shape[1]!=dim_x:
-            print ("dimension of mask_region should be the same with the dimension of fits_image!")
+        mask_region = mask_reproject(mask_ref, header, 
+                                     out_shape=(dim_y, dim_x))
+        if mask_region.shape[0] != dim_y or mask_region.shape[1] != dim_x:
+            print ("dimension of mask_region and fits_image should be the same!")
             sys.exit()
         else:
             mask_region1 = np.full((dim_y,dim_x), 0)
@@ -222,14 +237,21 @@ def subtract_background(workdir, fits_image, hdu_idx=0, sigma=3.0,
     skybgrms_image = bkg.background_rms
     
     name_out_skybgrms = path / "image" / f"var_{fits_image}"
-    fits.writeto(name_out_skybgrms, skybgrms_image.astype('>f4')**2, header, overwrite=True)
-    if verbose:
-        print(f"produce {name_out_skybgrms}")
+    # keep a user-provided variance image instead of overwriting it
+    if name_out_skybgrms.exists():
+        if verbose:
+            print(f"{name_out_skybgrms} exists.")
+    else:
+        fits.writeto(name_out_skybgrms, skybgrms_image.astype('>f4')**2, 
+                     header, overwrite=False)
+        if verbose:
+            print(f"produce {name_out_skybgrms}")
 
     # calculate background subtracted image:
     skybgsub_image = data_image - skybg_image
     name_out_skybgsub = path / "image" / f"skybgsub_{fits_image}"
-    fits.writeto(name_out_skybgsub, skybgsub_image.astype('>f4'), header, overwrite=True)
+    fits.writeto(name_out_skybgsub, skybgsub_image.astype('>f4'), 
+                 header, overwrite=True)
     if verbose:
         print(f"produce {name_out_skybgsub}")
 

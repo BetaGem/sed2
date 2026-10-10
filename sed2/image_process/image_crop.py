@@ -70,29 +70,33 @@ def _crop_band(args):
     dim_x1 = int(dim_x0 / pix_scale)
 
     # science image
-    hdu = fits.open(path / "image" / sci_file)[0]
-    wcs = WCS(hdu.header)
-    position = wcs.wcs_world2pix(ra, dec, 1)
-    cutout = Cutout2D(hdu.data, wcs=wcs, position=position,
-                      size=(dim_y1, dim_x1))
-    header = cutout.wcs.to_header()
+    with fits.open(path / "image" / sci_file) as hdul:
+        hdu = hdul[0]
+        wcs = WCS(hdu.header)
+        position = wcs.wcs_world2pix(ra, dec, 1)
+        cutout = Cutout2D(hdu.data, wcs=wcs, position=position,
+                          size=(dim_y1, dim_x1))
+        header = cutout.wcs.to_header()
 
-    # copy relevant header keywords
-    for key in hdu.header:
-        if 'MAGZP' in key:
-            header['MAGZP'] = hdu.header[key]
+        # copy relevant header keywords
+        for key in hdu.header:
+            if 'MAGZP' in key:
+                header['MAGZP'] = hdu.header[key]
 
     fits.writeto(crop_path / f"crop_{galaxy}_{f}.fits",
                  cutout.data, header, overwrite=True)
 
     # variance image
-    hdu = fits.open(path / "image" / var_file)[0]
-    wcs = WCS(hdu.header)
-    position = wcs.wcs_world2pix(ra, dec, 1)
-    cutout = Cutout2D(hdu.data, wcs=wcs, position=position,
-                      size=(dim_y1, dim_x1))
+    with fits.open(path / "image" / var_file) as hdul:
+        hdu = hdul[0]
+        wcs = WCS(hdu.header)
+        position = wcs.wcs_world2pix(ra, dec, 1)
+        cutout = Cutout2D(hdu.data, wcs=wcs, position=position,
+                          size=(dim_y1, dim_x1))
+        var_data = cutout.data
+
     fits.writeto(crop_path / f"crop_var_{galaxy}_{f}.fits",
-                 cutout.data, header, overwrite=True)
+                 var_data, header, overwrite=True)
 
 
 def crop(workdir, filters, coord, crop_size,

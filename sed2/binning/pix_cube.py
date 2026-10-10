@@ -158,157 +158,90 @@ def flux_map(workdir, galaxy, filters,
     map_flux     = np.full((n_band, *ref_img[0].data.shape), np.nan)
     map_flux_err = np.full((n_band, *ref_var[0].data.shape), np.nan)
 
+    # per-filter conversion constants
+    FLUXZP_2MASS = {"2mass_j": 3.129e-13,
+                    "2mass_h": 1.133e-13,
+                    "2mass_k": 4.283e-14}
+    DN_TO_JY = {"wise_w1": 1.9350e-06, "wise_w2": 2.7048e-06,
+                "wise_w3": 2.9045e-06, "wise_w4": 5.2269e-05}
+    BEAM_AREA = {"herschel_spire_250": 469.3542,
+                 "herschel_spire_350": 831.275,
+                 "herschel_spire_500": 1804.3058}
+    SDSS = {"sdss_u", "sdss_g", "sdss_r", "sdss_i", "sdss_z"}
+    SPITZER = {"spitzer_irac_36", "spitzer_irac_45", "spitzer_irac_58",
+               "spitzer_irac_80", "spitzer_mips_24", "spitzer_mips_70",
+               "spitzer_mips_160"}
+    PACS = {"herschel_pacs_70", "herschel_pacs_100", "herschel_pacs_160"}
+    SPIRE = {"herschel_spire_250", "herschel_spire_350", "herschel_spire_500"}
+
+    def _conv_factor(filt, wav, mag_zp=None):
+        '''Factor converting the native image unit to erg/s/cm^2/Ang.'''
+        jy = 1.0e-23 * 2.998e+18 / wav**2          # Jy -> erg/s/cm^2/Ang
+        if dp_unit:                                # DustPedia images: Jy/pixel
+            return jy
+        if filt == 'galex_fuv':
+            return 1.40e-15
+        if filt == 'galex_nuv':
+            return 2.06e-16
+        if filt in SDSS:
+            return 3.631e-6 * jy
+        if filt in FLUXZP_2MASS:
+            return FLUXZP_2MASS[filt] * 10**(-0.4 * mag_zp) * 1.0e3
+        if filt in SPITZER:
+            return 2.35044e-5 * pix_scale**2 * jy
+        if filt in ('wise_w1', 'wise_w2', 'wise_w3'):
+            return DN_TO_JY[filt] * jy
+        if filt == 'wise_w4' or filt in PACS:
+            return jy
+        if filt in SPIRE:
+            if unit_spire == 'Jy_per_beam':
+                return pix_scale**2 / BEAM_AREA[filt] * jy
+            if unit_spire == 'MJy_per_sr':
+                return 2.35044e-5 * pix_scale**2 * jy
+            if unit_spire == 'Jy_per_pixel':
+                return jy
+            print("unit of Herschel images is not recognized!")
+            sys.exit()
+        if filt[:4] in ('ctio', 'kpno', 'bok_', 'vatt'):
+            return jy
+        # otherwise the unit must be provided by the user
+        unit = img_unit[filt]
+        if unit == 'erg/s/cm2/A':
+            return 1.0
+        if unit == 'Jy':
+            return jy
+        if unit == 'MJy/sr':
+            return 2.35044e-5 * pix_scale**2 * jy
+        print(f"unit of filter {filt} is not recognized!")
+        sys.exit()
+
+    # pixel coordinates of the galaxy region (constant across bands)
+    r, c = np.where(gal_region == 1)
+
     # iterate over bands
     for i in range(n_band):
 
-        # load science and variance images
-        sci_hdu = fits.open(workdir / "matched" / f"{galaxy}_{filters[i]}.fits")
-        var_hdu = fits.open(workdir / "matched" / f"var_{galaxy}_{filters[i]}.fits")
-        sci_img_data = sci_hdu[0].data
-        var_img_data = var_hdu[0].data
-        sci_hdu.close()
-        var_hdu.close()
+        # load science and variance images, apply extinction correction
+        with fits.open(workdir / "matched" / f"{galaxy}_{filters[i]}.fits") as sci_hdu, \
+                fits.open(workdir / "matched" / f"var_{galaxy}_{filters[i]}.fits") as var_hdu:
+            sci_img_data = sci_hdu[0].data.copy() * A_factor[i]
+            var_img_data = var_hdu[0].data.copy() * A_factor[i]**2
 
-        # apply extinction correction
-        sci_img_data *= A_factor[i]
-        var_img_data *= A_factor[i]**2
-
-        # get pixel coordinates of the galaxy region
-        r, c = np.where(gal_region == 1)
-
-        # DustPedia images are in Jy / pixel
-        if dp_unit:
-            map_flux[i][r,c] = sci_img_data[r,c] * 1e-23 * 2.998e+18 / wave_piv[i]**2
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1e-23 * 2.998e+18 / wave_piv[i]**2
-            continue
-
-        # get magnitude zero-point and flux zero-point of 2MASS:
-        if '2mass' in filters[i]:
-            # get magnitude zero-point, -8.9 for Jy/pixel
+        # magnitude zero-point of 2MASS images
+        mag_zp = None
+        if filters[i] in FLUXZP_2MASS:
             if mag_zp_2mass is None:
-                hdu = fits.open(workdir / "matched" / f"{galaxy}_{filters[i]}.fits")
-                MAGZP_2mass = float(hdu[0].header["MAGZP"])
-                hdu.close()
+                with fits.open(workdir / "matched" / f"{galaxy}_{filters[i]}.fits") as hdu:
+                    mag_zp = float(hdu[0].header["MAGZP"])
             else:
-                MAGZP_2mass = mag_zp_2mass[{"2mass_j": 0, 
-                                            "2mass_h": 1, 
-                                            "2mass_k": 2}[filters[i]]]
+                mag_zp = mag_zp_2mass[{"2mass_j": 0,
+                                       "2mass_h": 1,
+                                       "2mass_k": 2}[filters[i]]]
 
-            # get flux at magnitude zero-point (Cohen+2003; in W/cm^2/micron)
-            FLUXZP_2mass = {"2mass_j": 3.129e-13,
-                            "2mass_h": 1.133E-13,
-                            "2mass_k": 4.283E-14}[filters[i]]
+        factor = _conv_factor(filters[i], wave_piv[i], mag_zp)
 
-        # get DN to Jy correction factors for WISE bands
-        if 'wise' in filters[i]:
-            DN_to_Jy = {"wise_w1": 1.9350e-06,
-                        "wise_w2": 2.7048E-06,
-                        "wise_w3": 2.9045e-06,
-                        "wise_w4": 5.2269E-05}[filters[i]]
-
-        # get beam area of Herschel SPIRE (in arcsec^2)
-        if 'herschel_spire' in filters[i]:
-            beam_area = {"herschel_spire_250": 469.3542,
-                         "herschel_spire_350": 831.275,
-                         "herschel_spire_500": 1804.3058}[filters[i]]
-
-        # GALEX/FUV
-        if filters[i] == 'galex_fuv':
-            map_flux[i][r,c] = sci_img_data[r,c] * 1.40e-15   # in erg/s/cm^2/Ang.
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.40e-15   # in erg/s/cm^2/Ang.
-
-        # GALEX/NUV
-        elif filters[i] == 'galex_nuv':
-            map_flux[i][r,c] = sci_img_data[r,c] * 2.06e-16   # in erg/s/cm^2/Ang.
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 2.06e-16   # in erg/s/cm^2/Ang.
-
-        # SDSS
-        elif filters[i] in ['sdss_u', 'sdss_g', 'sdss_r', 'sdss_i', 'sdss_z']:
-            f0 = sci_img_data[r,c] * 3.631e-6          # in Jy
-            map_flux[i][r,c] = f0 * 2.998e-5 / wave_piv[i]**2     # in erg/s/cm^2/Ang.
-
-            f0 = np.sqrt(np.abs(var_img_data[r,c])) * 3.631e-6     # in Jy
-            map_flux_err[i][r,c] = f0 * 2.998e-5 / wave_piv[i]**2  # in erg/s/cm^2/Ang.
-
-        # 2MASS (the image is in DN)
-        elif filters[i] in ['2mass_j', '2mass_h', '2mass_k']:
-            # flux
-            map_flux[i][r,c] = FLUXZP_2mass * sci_img_data[r,c] * 10**(-0.4 * MAGZP_2mass) * 1.0e+3  # in erg/s/cm^2/Ang.
-
-            # flux error
-            map_flux_err[i][r,c] = FLUXZP_2mass * np.sqrt(np.abs(var_img_data[r,c])) * 10**(-0.4 * MAGZP_2mass) * 1.0e+3  # in erg/s/cm^2/Ang.
-
-        # Spitzer: IRAC and MIPS (Spitzer image is in Mjy/sr)
-        elif filters[i] in ['spitzer_irac_36', 'spitzer_irac_45', 'spitzer_irac_58', 'spitzer_irac_80', 
-                            'spitzer_mips_24', 'spitzer_mips_70', 'spitzer_mips_160']:
-            f0 = sci_img_data[r,c] * 2.35044e-5 * pix_scale**2               # in unit of Jy
-            map_flux[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2     # in erg/s/cm^2/Ang.
-
-            f0 = np.sqrt(np.abs(var_img_data[r,c])) * 2.35044e-5 * pix_scale**2   # in unit of Jy
-            map_flux_err[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2      # in erg/s/cm^2/Ang.
-
-        # WISE (image is in DN)
-        elif filters[i] in ['wise_w1', 'wise_w2', 'wise_w3']:
-            map_flux[i][r,c] = sci_img_data[r,c] * DN_to_Jy * 1.0e-23 * 2.998e+18 / wave_piv[i]**2                      # in erg/s/cm^2/Ang.
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * DN_to_Jy * 1.0e-23 * 2.998e+18 / wave_piv[i]**2   # in erg/s/cm^2/Ang.
-
-        # !! -- w4 from z0mgs is in Jy -- !!
-        elif filters[i] == 'wise_w4' or filters[i] in ['herschel_pacs_70', 'herschel_pacs_100', 'herschel_pacs_160']:
-            map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2                        # in erg/s/cm^2/Ang.
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.0e-23 * 2.998e+18 / wave_piv[i]**2   # in erg/s/cm^2/Ang.
-
-        # Herschel SPIRE
-        elif filters[i] in ['herschel_spire_250', 'herschel_spire_350', 'herschel_spire_500']:
-            if unit_spire == 'Jy_per_beam':
-                # image is in Jy/beam -> surface brightness unit
-                # Jy/pixel = Jy/beam x beam/arcsec^2 x arcsec^2/pixel  -> flux density
-                f0 = sci_img_data[r,c] * pix_scale**2 / beam_area                  # Jy
-                map_flux[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2       # erg/s/cm^2/Ang.
-
-                f0 = np.sqrt(np.abs(var_img_data[r,c])) * pix_scale**2 / beam_area  # Jy
-                map_flux_err[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2    # erg/s/cm^2/Ang.
-
-            # in case the data is in Mjy/sr
-            elif unit_spire == 'MJy_per_sr':
-                f0 = sci_img_data[r,c] * 2.35044e-5 * pix_scale**2            # Jy
-                map_flux[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2  # erg/s/cm^2/Ang.
-
-                f0 = np.sqrt(np.abs(var_img_data[r,c])) * 2.35044e-5 * pix_scale**2   # Jy
-                map_flux_err[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2      # erg/s/cm^2/Ang.
-
-            # in case the data is in Jy/pixel or Jy
-            elif unit_spire == 'Jy_per_pixel':
-                map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2        # in erg/s/cm^2/Ang.
-                map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.0e-23 * 2.998e+18 / wave_piv[i]**2    # in erg/s/cm^2/Ang.
-
-            else:
-                print ("unit of Herschel images is not recognized!")
-                sys.exit()
-            
-        # H-alpha images should be in Jy
-        elif filters[i][:4] in ['ctio', 'kpno', 'bok_', 'vatt']:
-            map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2        # in erg/s/cm^2/Ang.
-            map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c])) * 1.0e-23 * 2.998e+18 / wave_piv[i]**2    # in erg/s/cm^2/Ang.
-
-        # units of other images should be provided in img_unit
-        else:
-            if img_unit[filters[i]]=='erg/s/cm2/A':
-                map_flux[i][r,c] = sci_img_data[r,c]
-                map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c]))
-
-            elif img_unit[filters[i]]=='Jy':
-                map_flux[i][r,c] = sci_img_data[r,c] * 1.0e-23 * 2.998e+18 / wave_piv[i]**2
-                map_flux_err[i][r,c] = np.sqrt(np.abs(var_img_data[r,c]))*1.0e-23*2.998e+18/ wave_piv[i]**2
-
-            elif img_unit[filters[i]]=='MJy/sr':
-                f0 = sci_img_data[r,c]*2.35044e-5 * pix_scale**2             # in unit of Jy
-                map_flux[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2 # in erg/s/cm^2/Ang.
-
-                f0 = np.sqrt(np.abs(var_img_data[r,c])) * 2.35044e-5 * pix_scale**2   # in unit of Jy
-                map_flux_err[i][r,c] = f0 * 1.0e-23 * 2.998e+18 / wave_piv[i]**2      # in erg/s/cm^2/Ang.
-            else:
-                print (f"unit of filter {filters[i]} is not recognized!")
-                sys.exit()
+        map_flux[i][r, c] = sci_img_data[r, c] * factor
+        map_flux_err[i][r, c] = np.sqrt(np.abs(var_img_data[r, c])) * factor
 
     # --- end of flux conversion ---
 

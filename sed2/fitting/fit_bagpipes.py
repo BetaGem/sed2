@@ -7,8 +7,6 @@ from ..path import PATH
 __all__ = [
     "build_all",
     "fit_info",
-    "load_filters",
-    "load_phot",
     "run",
 ]
 
@@ -25,48 +23,60 @@ HA_FILTERS = {
 
 # functions
 # -----------------------------
-def load_phot(ID):
+class _Photometry:
     """
-    Load photometry for a given spatial bin ID.
+    Callable photometry provider for Bagpipes.
+
+    Encapsulates the flux table and the finite-value mask so that no module
+    level state is required: the instance is passed directly to
+    ``pipes.galaxy`` and called with the bin ``ID``.
     """
-    global fini
-    ID = int(ID)
+    def __init__(self, flux_table, filter_list=None, redshift=0.0022):
+        self.catalog = Table.read(str(flux_table))
+        self.catalog_err = Table.read(str(flux_table).replace(".fits", "_err.fits"))
+        self.filters = (list(filter_list) if filter_list is not None
+                        else list(self.catalog.colnames[1:]))
+        self.redshift = redshift
+        self.fini = None
 
-    # flux in unit of erg/s/cm^2/Angstrom
-    if ID == 9999:
-        f_lamb = np.nansum(list(catalog.values()), axis=1)[1:]
-        f_lamb_err = np.nansum(list(catalog_err.values()), axis=1)[1:]
-    else:
-        f_lamb = np.array(list(catalog[ID].values()))[1:]
-        f_lamb_err = np.array(list(catalog_err[ID].values()))[1:]
+    def __call__(self, ID):
+        ID = int(ID)
 
-    # remove nan values
-    fini = np.isfinite(f_lamb) & np.isfinite(f_lamb_err)
-    f_lamb = f_lamb[fini]
-    f_lamb_err = f_lamb_err[fini]
+        # flux in unit of erg/s/cm^2/Angstrom
+        if ID == 9999:
+            f_lamb = np.nansum(list(self.catalog.values()), axis=1)[1:]
+            f_lamb_err = np.nansum(list(self.catalog_err.values()), axis=1)[1:]
+        else:
+            f_lamb = np.array(list(self.catalog[ID].values()))[1:]
+            f_lamb_err = np.array(list(self.catalog_err[ID].values()))[1:]
 
-    # turn this into a 2D array
-    photometry = np.array([f_lamb, f_lamb_err]).T
+        # remove nan values
+        self.fini = np.isfinite(f_lamb) & np.isfinite(f_lamb_err)
+        f_lamb = f_lamb[self.fini]
+        f_lamb_err = f_lamb_err[self.fini]
 
-    # add a constant model uncertainty of 5%
-    for i in range(len(photometry)):
-        photometry[i, 1] = np.sqrt( photometry[i, 1]**2 + (0.05 * photometry[i, 0])**2 )
+        # turn this into a 2D array
+        photometry = np.array([f_lamb, f_lamb_err]).T
 
-    return photometry
+        # add a constant model uncertainty of 5%
+        photometry[:, 1] = np.sqrt(photometry[:, 1]**2
+                                   + (0.05 * photometry[:, 0])**2)
 
+        return photometry
 
-def load_filters(filter_names):
-    """
-    Create a list of filter paths from sedpy.
-    """
-    filter_path = PATH / "filters"
-    filter_list = [filter_path / f"{f}.par" for f in filter_names]
-
-    return np.array(filter_list)[fini]
+    def filter_paths(self):
+        """Filter transmission files matching the finite photometry."""
+        if self.fini is None:
+            raise RuntimeError(
+                "Call the photometry provider before requesting filter paths.")
+        filter_path = PATH / "filters"
+        filter_list = [filter_path / f"{f}.par" for f in self.filters]
+        return np.array(filter_list)[self.fini]
 
 
 def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
-             use_halpha=False, nebular_metallicity=None, dust_ratio=None):
+             use_halpha=False, nebular_metallicity=None, dust_ratio=None,
+             redshift=0.0022):
     """
     Create the fit instruction dictionary.
 
@@ -76,7 +86,7 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     """
     fit_instructions = {}
     fit_instructions["t_bc"] = 0.01
-    fit_instructions["redshift"] = z
+    fit_instructions["redshift"] = redshift
     _age_myr = (pipes.utils.cosmo.age(fit_instructions["redshift"]).value - \
                 pipes.utils.cosmo.age(10).value) * 1e3  # convert to Myr
 
@@ -100,11 +110,6 @@ def fit_info(dust_emission=True, nebular_emission=True, Leja_SFH=True,
     else:
         dust["eta_prior_mu"] = 1 / 0.44
     dust["eta_prior_sigma"] = 0.3
-
-    # dust["type"] = "Salim"
-    # dust["Av"] = (0., 4.)
-    # dust['delta'] = (-1.2, 0.4)
-    # dust["B"] = (0, 1)
 
     fit_instructions["dust"] = dust
     
@@ -159,19 +164,9 @@ def build_all(ID, flux_table, filter_list=None,
     fit_inst : dict
         The fit instruction dictionary.
     """
-    # define some global variables
-    global catalog, catalog_err, filters, fini, z
-
-    # load basic info
-    z = redshift
-    flux_table = str(flux_table)
-    catalog = Table.read(flux_table)
-    catalog_err = Table.read(flux_table.replace(".fits", "_err.fits"))
-    
-    if filter_list is not None:
-        filters = filter_list
-    else:
-        filters = catalog.colnames[1:] # use all filters in the table
+    # photometry provider (encapsulates the catalog: no module-level state)
+    phot = _Photometry(flux_table, filter_list, redshift)
+    filters = phot.filters
 
     # check if Halpha is in the filter list
     halpha = any(f in HA_FILTERS for f in filters)
@@ -193,16 +188,15 @@ def build_all(ID, flux_table, filter_list=None,
         if 'eta' in prior_npz:
             dust_ratio = prior_npz['eta']
 
-    # initialize fini
-    fini = np.full_like(filters, True)
-    _ = load_phot(ID)  
+    _ = phot(ID)      # populate the finite-value mask
+    filter_paths = phot.filter_paths()
 
     # standard Bagpipes objects
-    filter_paths = load_filters(filters)
-    galaxy = pipes.galaxy(ID, load_phot, filt_list=filter_paths, 
+    galaxy = pipes.galaxy(ID, phot, filt_list=filter_paths,
                           spectrum_exists=False, phot_units='ergscma')
-    fit_inst = fit_info(use_halpha=halpha, 
-                        nebular_metallicity=zgas, dust_ratio=dust_ratio)
+    fit_inst = fit_info(use_halpha=halpha,
+                        nebular_metallicity=zgas, dust_ratio=dust_ratio,
+                        redshift=redshift)
 
     return galaxy, fit_inst
 

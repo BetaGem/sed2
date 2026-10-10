@@ -1,5 +1,4 @@
 import json  # noqa: EXE002
-import re
 from pathlib import Path
 
 from .utils_filter import *
@@ -65,24 +64,15 @@ def parse_steps(steps_str):
     return [s.strip() for s in steps_str.split(",")]
 
 
-def _set_value(line, value):
-    """Replace the value in a key-value line, keeping any trailing comment."""
-    match = re.match(r"^(\s*\S+\s+)\S+(\s*#.*)?\s*$", line.rstrip("\n"))
-    if not match:
-        return line
-    comment = match.group(2) or ""
-    return f"{match.group(1)}{value}{comment}\n"
-
-
 def resolve_coord(par_file, params):
     """
-    Resolve the galaxy coordinates and update the parameter file.
+    Resolve the galaxy coordinates and update the parameter dict.
 
     If ``ra``/``dec`` are already set in ``params``, they are returned
     as-is. Otherwise the galaxy name is resolved with
     ``SkyCoord.from_name`` and the resolved values are written back into
-    the parameter file. An error is raised if the name cannot be resolved
-    and no ra/dec are provided.
+    ``params`` (the parameter file is left untouched). An error is raised
+    if the name cannot be resolved and no ra/dec are provided.
     """
     from astropy.coordinates import SkyCoord
 
@@ -105,18 +95,9 @@ def resolve_coord(par_file, params):
 
     ra, dec = coord.ra.value, coord.dec.value
 
-    par_file = Path(par_file)
-    with open(par_file) as f:
-        lines = f.readlines()
-    with open(par_file, "w") as f:
-        for line in lines:
-            key = line.split(None, 1)[0] if line.split() else ""
-            if key == "ra":
-                f.write(_set_value(line, f"{ra:.6f}"))
-            elif key == "dec":
-                f.write(_set_value(line, f"{dec:.6f}"))
-            else:
-                f.write(line)
+    # update the in-memory parameters only (do not rewrite the par file)
+    params["ra"] = ra
+    params["dec"] = dec
 
     return coord
 
@@ -196,7 +177,7 @@ def select_dict(dict, keys):
 
 
 
-def plot_stamps(img_paths, filters=None, figsize=(15, 8), log=False,
+def plot_stamps(img_paths, filters=None, figsize=3, log=False,
                 vmin=16, vmax=99, out_path=None):
     '''
     plot a set of images.
@@ -207,8 +188,8 @@ def plot_stamps(img_paths, filters=None, figsize=(15, 8), log=False,
         A list of image file paths to plot.
     filters : list, optional
         A list of filters to apply to the images.
-    figsize : tuple, optional
-        The size of the figure to create.
+    figsize : float, optional
+        The size of each panel.
     log : bool, optional
         Whether to use a logarithmic scale for the images.
     '''
@@ -219,13 +200,13 @@ def plot_stamps(img_paths, filters=None, figsize=(15, 8), log=False,
     n_img = len(img_paths)
     col, row = 6, (n_img // 6) + 1
 
-    plt.figure(figsize=figsize)
+    plt.figure(figsize=(col*figsize, row*figsize))
 
     for i, img_path in enumerate(img_paths):    
-        # load image
+
         hdu = fits.open(img_path)
         img_data = np.log10(hdu[0].data) if log else hdu[0].data
-        # create WCS projection
+
         plt.subplot(row, col, i+1)
         plt.imshow(img_data, 
                    vmin=np.nanpercentile(img_data, vmin),

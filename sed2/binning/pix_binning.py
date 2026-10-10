@@ -15,18 +15,13 @@ __all__ = [
     "redchi2_two_seds",
 ]
 
-def redchi2_two_seds(sed1=None, e_sed1=None, sed2=None, e_sed2=None):
+def redchi2_two_seds(sed1, e_sed1, sed2, e_sed2):
     '''
     Calculate the reduced chi-squared statistic for two SEDs
     '''
-    for s in [sed1, sed2, e_sed1, e_sed2]:
-        if s is None:
-            s = []
-    top = np.sum(sed2 * sed1 / (e_sed1**2 + e_sed2**2))
-    bottom = np.sum(sed1**2 / (e_sed1**2 + e_sed2**2))
-    norm = top / bottom
-
-    red_chi2 = np.sum((sed2 - (norm * sed1))**2 / (e_sed1**2 + e_sed2**2)) / len(sed1)
+    denom = e_sed1**2 + e_sed2**2
+    norm = np.sum(sed2 * sed1 / denom) / np.sum(sed1**2 / denom)
+    red_chi2 = np.sum((sed2 - (norm * sed1))**2 / denom) / len(sed1)
 
     return red_chi2
 
@@ -128,21 +123,29 @@ def pixel_binning(workdir, ref_band,
                            map_flux[ref_band][rows, cols].shape)
     yc, xc = rows[idx[0]], cols[idx[0]]   # peak flux in ref band
 
+    # SED-shape similarity between the peak pixel and its neighbours
+    ys = slice(max(yc - 1, 0), yc + 2)   # original: yc-2:yc+2
+    xs = slice(max(xc - 1, 0), xc + 2)   # original: xc-2:xc+2
+    neigh_sed = map_flux_trans[ys, xs]              # (ny, nx, n_band)
+    neigh_err = map_flux_err_trans[ys, xs]
+    yy_idx = np.arange(ys.start, ys.stop)
+    xx_idx = np.arange(xs.start, xs.stop)
+    # original kept only pixels with both row and column != centre (the corners)
+    neigh_mask = (yy_idx[:, None] != yc) & (xx_idx[None, :] != xc)
+    neigh_sed = neigh_sed[neigh_mask]               # (n_neigh, n_band)
+    neigh_err = neigh_err[neigh_mask]
+
     status_add = 1
     factor = 0.01                         # 1% sys. flux error!
     while status_add == 1:
-        sed1 = map_flux_trans[yc][xc]
-        e_sed1 = np.sqrt((map_flux_err_trans[yc][xc])**2 + (factor*sed1)**2)
-        pix_chi2 = []
-        for yy in range(yc-1, yc+2):      # original: yc-2:yc+2
-            for xx in range(xc-1, xc+2):  # original: xc-2:xc+2
-                if yy != yc and xx != xc:
-                    sed2 = map_flux_trans[yy][xx]
-                    e_sed2 = np.sqrt((map_flux_err_trans[yy][xx])**2 + (factor*sed2)**2)
-                    red_chi2 = redchi2_two_seds(sed1=sed1, e_sed1=e_sed1,
-                                                sed2=sed2, e_sed2=e_sed2)
-                    pix_chi2.append(red_chi2)
-        pix_chi2 = np.asarray(pix_chi2)
+        sed1 = map_flux_trans[yc, xc]
+        e_sed1 = np.sqrt(map_flux_err_trans[yc, xc]**2 + (factor * sed1)**2)
+        e_sed2 = np.sqrt(neigh_err**2 + (factor * neigh_sed)**2)
+        denom = e_sed1**2 + e_sed2**2
+        norm = (np.sum(neigh_sed * sed1 / denom, axis=1)
+                / np.sum(sed1**2 / denom, axis=1))
+        pix_chi2 = np.sum((neigh_sed - norm[:, None] * sed1)**2 / denom,
+                          axis=1) / n_band
         if np.median(pix_chi2) <= 2.0:
             status_add = 0
 
@@ -180,10 +183,9 @@ def pixel_binning(workdir, ref_band,
     dim_y = gal_region.shape[0]
     dim_x = gal_region.shape[1]
 
-    # initialize
-    pixbin_map       = np.zeros((dim_y, dim_x))
-    map_bin_flux     = np.zeros((dim_y, dim_x, n_band))
-    map_bin_flux_err = np.zeros((dim_y, dim_x, n_band))
+    # initialize (the per-bin flux cubes are allocated after binning to
+    # keep them out of the main loop's memory footprint)
+    pixbin_map = np.zeros((dim_y, dim_x))
 
     rows, cols = np.where((gal_region==1) & (pixbin_map==0))
     tot_npixs  = len(rows)   # total number of pixels in the region-of-interest
@@ -238,8 +240,6 @@ def pixel_binning(workdir, ref_band,
             # get bin
             count_bin = count_bin + 1
             pixbin_map[rows1, cols1] = count_bin
-            map_bin_flux[rows1, cols1] = tot_bin_flux
-            map_bin_flux_err[rows1, cols1] = np.sqrt(tot_bin_flux_err2)
             cumul_npixs_in_bin = cumul_npixs_in_bin + len(rows1)
 
         # if SNR threthold is not satisfied, grow the bin
@@ -392,6 +392,8 @@ def pixel_binning(workdir, ref_band,
     pixbin_map = pixbin_map_clean
 
     # calculate bin flux and flux error maps
+    map_bin_flux     = np.zeros((dim_y, dim_x, n_band))
+    map_bin_flux_err = np.zeros((dim_y, dim_x, n_band))
     for i in range(1, np.max(pixbin_map) + 1):
         rows, cols = np.where(pixbin_map == i)
         tot_bin_flux = np.sum(map_flux_trans[rows, cols], axis=0)
@@ -563,20 +565,28 @@ def get_bin_flux(workdir, galaxy, fluxmap_path=None,
     msk = binmap > 0
     apers = []
 
+    # precompute the per-bin masks once and reuse them for every band
+    bin_masks = [binmap == j for j in range(1, n_bin + 1)]
+    bin0_mask = binmap == 0
+    bin0_npix = np.sum(bin0_mask)
+
     # Calculate background sampling error
     print("Calculating background sampling error ...")
     for i in tqdm(range(n_band)): 
 
-        img = fits.open(path / "matched" / f"{galaxy}_{filters[i]}.fits")[0].data
+        # load into memory so the file can be closed (matched images are small)
+        with fits.open(path / "matched" / f"{galaxy}_{filters[i]}.fits",
+                       memmap=False) as hdul:
+            img = hdul[0].data
 
         # flux conversion unit
-        bin_ = binmap == 1
+        bin_ = bin_masks[0]
         bin_unit = np.median(fluxmap[i][bin_]) / np.nansum(img[bin_])
 
         e_last = 0.0
 
         for j in range(1, n_bin+1):
-            bin_ = binmap == j
+            bin_ = bin_masks[j-1]
             aper_ = None if i == 0 else apers[j-1]
 
             flux_err, _, aper = bin_noise(
@@ -589,7 +599,8 @@ def get_bin_flux(workdir, galaxy, fluxmap_path=None,
                     mask_src=msk, bootstrap=bootstrap*2, circle_aper=True)
             if flux_err == 0:
                 # assume Gaussian noise
-                flux_err = e_last * np.sqrt(np.sum(bin_) / np.sum(binmap == j-1))
+                prev_npix = bin0_npix if j == 1 else np.sum(bin_masks[j-2])
+                flux_err = e_last * np.sqrt(np.sum(bin_) / prev_npix)
 
             e_last = flux_err
             if i == 0: apers.append(aper)

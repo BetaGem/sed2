@@ -6,8 +6,8 @@
 # Basic I/O
 # ---------------------------------------------------------
 galaxy          NGC0628     # Galaxy name (e.g., NGC0628)
-workdir        /home/pku/Astro/sed2/demo/data      # Working directory
-steps           mask, imask       # Pipeline steps to run (bkg, crop, mask, imask, psf, roi, bin, fit, 2pass)
+workdir         /home/pku/Astro/sed2/demo/data      # Working directory
+steps           fit, 2pass       # Pipeline steps to run (bkg, crop, mask, imask, psf, roi, bin, fit, 2pass)
 n_process       8           # Number of parallel processes
 verbose         True        # Verbose output
 
@@ -26,8 +26,8 @@ bkg_plot_mask   True        # Plot the background source mask
 # Cropping
 # ---------------------------------------------------------
 crop_size       1800             # Crop size in arcsec
-ra              24.173938        # RA center in deg (none = resolve from galaxy)
-dec             15.783641        # Dec center in deg (none = resolve from galaxy)
+ra              none        # RA center in deg (none = resolve from galaxy)
+dec             none        # Dec center in deg (none = resolve from galaxy)
 
 # ---------------------------------------------------------
 # Masking

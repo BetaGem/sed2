@@ -114,6 +114,11 @@ def run(par_file=None):
         # ---- background subtraction ----
         if step == "bkg":
             print(f"\n>>> Background subtraction [{galaxy}]")
+
+            bkg_out = workdir / "image" / f"skybgsub_{galaxy}_{params['filters'][0]}.fits"
+            if utils.check_output(bkg_out):
+                continue
+
             improc.reference_mask(workdir,
                                   f"{galaxy}_{params['bkg_ref_band']}.fits",
                                   nsigma=params.get("bkg_ref_sigma", 1.5))
@@ -163,6 +168,11 @@ def run(par_file=None):
         # --- source masking ----
         elif step == "mask":
             print(f"\n>>> Source masking [{galaxy}]")
+
+            mask_out = workdir / "masked" / f"mask_{galaxy}_{params['filters'][0]}.fits"
+            if utils.check_output(mask_out):
+                continue
+
             improc.reference_mask(workdir, 
                                   f"crop_{galaxy}_{params['bkg_ref_band']}.fits",
                                   type="cropped",

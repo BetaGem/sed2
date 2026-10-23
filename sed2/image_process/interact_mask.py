@@ -35,20 +35,39 @@ from matplotlib.patches import Circle
 __all__ = ["CircleMaskCreator", "interactive_mask"]
 
 
+def _downsample_for_display(data, max_size=3200):
+    '''
+    Stride large images down for fast interactive rendering.
+
+    Returns the down-sampled array and the stride used. Circle coordinates
+    stay in full-resolution pixels because the view uses a matching extent.
+    '''
+    step = max(1, int(np.ceil(max(data.shape) / max_size)))
+    # copy so the full-resolution array can be freed after loading
+    return data[::step, ::step].copy(), step
+
+
 class CircleMaskCreator:
     def __init__(self, fits_file, output_path, stretch_factor=0.1):
         import matplotlib.pyplot as plt
 
         self.fits_file = fits_file
         self.output_path = output_path
-        self.original_data = fits.getdata(fits_file)
+
+        # Keep a down-sampled copy for display: re-rendering a full SDSS-sized
+        # image on every stretch change / mouse drag is very slow.
+        data = fits.getdata(fits_file)
+        self.shape = data.shape
+        self.display_data, self.display_step = _downsample_for_display(data)
+        del data
+
         self.mode = "add"
         self.vmin = 5.
         self.vmax = 99.8
         self.stretch_factor = stretch_factor
 
         # Create figure with adaptive size
-        aspect_ratio = self.original_data.shape[1] / self.original_data.shape[0]
+        aspect_ratio = self.shape[1] / self.shape[0]
         figsize = (10 * aspect_ratio, 10)
 
         self.fig = plt.figure(figsize=figsize)
@@ -84,19 +103,24 @@ class CircleMaskCreator:
     def update_display(self):
         """Update the image display with current stretch settings"""
         self.norm = ImageNormalize(
-            self.original_data,
-            vmin=np.nanpercentile(self.original_data, self.vmin),
-            vmax=np.nanpercentile(self.original_data, self.vmax),
+            self.display_data,
+            vmin=np.nanpercentile(self.display_data, self.vmin),
+            vmax=np.nanpercentile(self.display_data, self.vmax),
             stretch=AsinhStretch(a=self.stretch_factor),
             clip=False
         )
 
+        ny, nx = self.shape
+
         # Remove only the image (not other elements)
         self.ax.clear()
 
-        # Redraw image
-        self.ax.imshow(self.original_data, origin='lower',
-                       cmap='gray', norm=self.norm)
+        # Redraw the down-sampled image, stretched to full-resolution pixels
+        self.ax.imshow(self.display_data, origin='lower',
+                       cmap='gray', norm=self.norm,
+                       extent=(0, nx, 0, ny), interpolation='nearest')
+        self.ax.set_xlim(0, nx)
+        self.ax.set_ylim(0, ny)
         self.ax.text(0.01, 0.01, str(self.fits_file),
                      transform=self.ax.transAxes, fontsize=8,
                      bbox={'fc': 'w', 'alpha': .7})
@@ -138,7 +162,7 @@ class CircleMaskCreator:
             if to_remove:
                 to_remove.remove()
                 self.circles.remove(to_remove)
-                self.fig.canvas.draw()
+                self.fig.canvas.draw_idle()
 
     def on_motion(self, event):
         if not self.dragging or event.inaxes != self.ax:
@@ -148,7 +172,7 @@ class CircleMaskCreator:
             x0, y0 = self.press_pos
             radius = np.hypot(event.xdata - x0, event.ydata - y0)
             self.current_circle.radius = radius
-            self.fig.canvas.draw()
+            self.fig.canvas.draw_idle()
 
     def on_release(self, event):
         if event.button != 1 or not self.dragging:
@@ -160,7 +184,7 @@ class CircleMaskCreator:
         else:
             self.current_circle.remove()
         self.current_circle = None
-        self.fig.canvas.draw()
+        self.fig.canvas.draw_idle()
 
     def on_key_press(self, event):
         if event.key == 'Q':
@@ -179,7 +203,7 @@ class CircleMaskCreator:
             for c in self.circles:
                 c.remove()
             self.circles = []
-            self.fig.canvas.draw()
+            self.fig.canvas.draw_idle()
             print("All masks removed")
         elif event.key == '=':
             self.vmax = min(self.vmax + 0.2, 100)
@@ -204,6 +228,10 @@ class CircleMaskCreator:
         """Convert binary mask to circle patches"""
         from skimage.measure import find_contours
 
+        # trace contours on the down-sampled mask, then scale back to pixels
+        step = self.display_step
+        if step > 1:
+            mask = mask[::step, ::step]
         contours = find_contours(mask, 0.5)
         for contour in contours:
             # Fit circles to mask regions
@@ -212,8 +240,8 @@ class CircleMaskCreator:
             radius = np.mean(np.sqrt((x - center_x)**2 + (y - center_y)**2))
 
             circle = Circle(
-                (center_x, center_y),
-                radius=radius,
+                (center_x * step, center_y * step),
+                radius=radius * step,
                 edgecolor='orange',
                 facecolor='none',
                 lw=0.5
@@ -221,17 +249,28 @@ class CircleMaskCreator:
             self.ax.add_patch(circle)
             self.circles.append(circle)
 
-        self.fig.canvas.draw()
+        self.fig.canvas.draw_idle()
 
     def save_mask(self):
-        mask = np.zeros_like(self.original_data, dtype=bool)
-        y, x = np.indices(self.original_data.shape)
+        mask = np.zeros(self.shape, dtype=bool)
+        ny, nx = self.shape
 
         for c in self.circles:
             cx, cy = c.center
-            r = c.radius
-            # Simple circle equation - no rotation needed
-            mask |= (x - cx)**2 + (y - cy)**2 <= r**2
+            r = float(c.radius)
+            if r <= 0:
+                continue
+
+            # only evaluate the circle's bounding box (fast on large images)
+            x0 = max(int(np.floor(cx - r)), 0)
+            x1 = min(int(np.ceil(cx + r)) + 1, nx)
+            y0 = max(int(np.floor(cy - r)), 0)
+            y1 = min(int(np.ceil(cy + r)) + 1, ny)
+            if x1 <= x0 or y1 <= y0:
+                continue
+
+            yy, xx = np.ogrid[y0:y1, x0:x1]
+            mask[y0:y1, x0:x1] |= (xx - cx)**2 + (yy - cy)**2 <= r**2
 
         # Save as compressed numpy format
         np.save(self.output_path, mask)
@@ -304,6 +343,10 @@ def interactive_mask(workdir, galaxy, filters, image_type="masked",
     # Prefer an interactive backend; fall back to the default if unavailable.
     with suppress(ImportError):
         plt.switch_backend("Qt5Agg")
+
+    # drop any figures left open by earlier pipeline steps so only the
+    # interactive masking window is shown
+    plt.close("all")
 
     path = Path(workdir)
     masked_dir = path / "masked"

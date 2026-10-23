@@ -32,6 +32,7 @@ build/
 *.hdf5
 *.tar.gz
 *.tgz
+*.pkl
 
 # Common data folders
 data/

@@ -142,6 +142,7 @@ def reference_mask(workdir, fits_image, type="image", name_out_mask=None,
     plt.imshow(hdu.data, vmax=np.nanpercentile(hdu.data, 95), origin='lower')
     plt.imshow(mask, cmap='gray', alpha=.3, origin='lower')
     plt.savefig(Path(name_out_mask).with_suffix(".jpg"))
+    plt.close()
 
 
 

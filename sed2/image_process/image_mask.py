@@ -239,7 +239,7 @@ def mask_separate(working_dir, bkg_ref_band, galaxy=None,
 
 
 def center_stars(workdir, hdu, seg_center, coord,
-                 year_to_gaia=-12, pm_sigma=5):
+                 year_to_gaia=-12, pm_sigma=3.5, mag_limit=19):
     '''
     get gaia stars within the inner mask.
     '''
@@ -258,8 +258,11 @@ def center_stars(workdir, hdu, seg_center, coord,
     
     gaia_cat = Table.read(path / "aux" / gaia_cat)
 
-    gaia_select = ((np.abs(gaia_cat['pmra']) / gaia_cat['pmra_error'] > pm_sigma) |\
-                   (np.abs(gaia_cat['pmdec']) / gaia_cat['pmdec_error'] > pm_sigma)) & (gaia_cat['ra'] > 0)
+    gaia_select = (
+        (np.abs(gaia_cat['pmra']) / gaia_cat['pmra_error'] > pm_sigma)
+        | (np.abs(gaia_cat['pmdec']) / gaia_cat['pmdec_error'] > pm_sigma)
+        | (gaia_cat['parallax'] / gaia_cat['parallax_error'] > pm_sigma)
+    ) & (gaia_cat['ra'] > 0)
     stars = gaia_cat[gaia_select]
     
     # correct for proper motion of stars (catalog unit = mas)
@@ -284,14 +287,15 @@ def center_stars(workdir, hdu, seg_center, coord,
         _r = 10
         if np.sqrt( (x-WCS(hdu.header).pixel_shape[1]/2)**2 + (y-WCS(hdu.header).pixel_shape[0]/2)**2) < _r:
             continue
-        if stars['phot_rp_mean_mag'][i] > 19 and stars['phot_bp_mean_mag'][i] > 19: # skip faint stars
+        if stars['phot_rp_mean_mag'][i] > mag_limit and stars['phot_bp_mean_mag'][i] > mag_limit: # skip faint stars ?
             continue
         cstars_index.append(i)
 
     return stars[cstars_index]
     
 
-def get_high_z_source(hdu, tractor_cat, sweep_cat, seg_center, gal_z=0):
+def get_high_z_source(hdu, tractor_cat, sweep_cat, seg_center, 
+                      gal_z=0, mag_limit=19):
     '''
     get high-z sources from the tractor catalog.
     '''
@@ -325,14 +329,15 @@ def get_high_z_source(hdu, tractor_cat, sweep_cat, seg_center, gal_z=0):
         r, z = get_photometry(tractor_cat, i)
 
         # select possible high-z sources
-        if z < 19 and ((z_mean - 3 * z_std > gal_z) or (z_mean > 0.05 and 2. * z_std < z_mean)) and r - z > 0 and z > 12:
+        if z < mag_limit and ((z_mean - 3 * z_std > gal_z) or (z_mean > 0.05 and 2. * z_std < z_mean)) and r - z > 0 and z > 12:
             highz_idx.append(i)
     
     return tractor_cat_highz[highz_idx]
 
 
 def get_catalogs(workdir, galaxy, bkg_ref_band, coord,
-                 gal_z=0, year_to_gaia=-12, pm_sigma=5, nprocess=1):
+                 gal_z=0, year_to_gaia=-12, pm_sigma=5, nprocess=1,
+                 mag_limit=19):
     '''
     get the catalogs center stars and high-z sources.
     '''
@@ -347,8 +352,10 @@ def get_catalogs(workdir, galaxy, bkg_ref_band, coord,
     path = Path(workdir)
     ref_hdu = fits.open(path / "cropped" / f"crop_{galaxy}_{bkg_ref_band}.fits")[0]
     ref_wcs = WCS(ref_hdu.header)
-    seg_center = fits.open(path / "image" / "ref_mask_inner.fits")[0]
-    seg_center = utils.reproject_mask(seg_center.data, WCS(seg_center.header),
+    seg_center = fits.open(path / "aux" / "ref_mask_inner.fits")[0]
+    seg_cen_dilate = ndimage.binary_dilation(seg_center.data, 
+                                             structure=np.ones((3, 3))).astype(int)
+    seg_center = utils.reproject_mask(seg_cen_dilate, WCS(seg_center.header),
                                       ref_wcs, ref_hdu.data.shape, cval=np.nan)
     
     # get desi catalogs
@@ -361,12 +368,14 @@ def get_catalogs(workdir, galaxy, bkg_ref_band, coord,
     # source detection within the central region
     cstars = center_stars(workdir, ref_hdu, seg_center, 
                           coord=coord, 
-                          year_to_gaia=year_to_gaia, pm_sigma=pm_sigma)
+                          year_to_gaia=year_to_gaia, pm_sigma=pm_sigma,
+                          mag_limit=mag_limit)
 
     try:
         photoz  = get_sweep_photoz(workdir, ralo, rahi, declo, dechi)
         tractor = get_tractor_catalog(workdir, ralo, rahi, declo, dechi, nprocess=nprocess)
-        csources = get_high_z_source(ref_hdu, tractor, photoz, seg_center, gal_z)
+        csources = get_high_z_source(ref_hdu, tractor, photoz, seg_center, gal_z,
+                                     mag_limit=mag_limit)
         print(f"Found {len(cstars)} center stars and {len(csources)} high-z sources.")
     except (RuntimeError, ConnectionError, TimeoutError): 
         print("Warning: Get high-z source from Legacy Survey failed ...")

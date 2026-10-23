@@ -185,6 +185,7 @@ def run(par_file=None):
                                 bkg_ref_band=params["bkg_ref_band"], 
                                 coord=params["coord"],
                                 gal_z=params.get("redshift", 0.0),
+                                mag_limit=params.get("mask_mag_limit", 20),
                                 nprocess=nprocess)
 
             args_list = [(workdir, galaxy, f, 

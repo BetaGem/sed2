@@ -29,7 +29,7 @@ class BSEDresults:
         self.galaxy, self.fit_info = script.build_all(ID, flux_table,
                                                       filter_list, redshift,
                                                       manual_prior=manual_prior)
-        # TODO: Remove the path when publishing
+        # TODO: Remove the path when publishing ?
         self.fit = pipes.fit(self.galaxy, self.fit_info,
                              run=self.run, n_posterior=n_posterior,
                              path=path_posterior)  

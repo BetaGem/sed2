@@ -7,7 +7,7 @@
 # ---------------------------------------------------------
 galaxy          NGC0628     # Galaxy name (e.g., NGC0628)
 workdir         /home/pku/Astro/sed2/demo/data      # Working directory
-steps           mask        # Pipeline steps to run (bkg, crop, mask, imask, psf, roi, bin, fit, 2pass)
+steps           roi, bin        # Pipeline steps to run (bkg, crop, mask, imask, psf, roi, bin, fit, 2pass)
 n_process       8           # Number of parallel processes
 verbose         True        # Verbose output
 
@@ -19,13 +19,12 @@ bkg_ref_sigma   1.0          # Sigma-clipping threshold for background mesh
 bkg_box_size    none        # Background mesh box size (none = auto)
 bkg_mask_thresh 2.5         # Source-detection threshold for the mask
 bkg_npixels     10          # Minimum number of pixels for a source
-bkg_gaussian_noise True     # Model background noise with a Gaussian
 bkg_plot_mask   True        # Plot the background source mask
 
 # ---------------------------------------------------------
 # Cropping
 # ---------------------------------------------------------
-crop_size       1800             # Crop size in arcsec
+crop_size       1800        # Crop size in arcsec
 ra              none        # RA center in deg (none = resolve from galaxy)
 dec             none        # Dec center in deg (none = resolve from galaxy)
 

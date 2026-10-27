@@ -175,22 +175,42 @@ def get_tractor_catalog(workdir, ralo, rahi, declo, dechi,
     return tractor_cat
 
 
-def get_photoz(sweep_cat, brickid, objid):
+def _sweep_index(sweep_cat):
+    '''
+    Build a sorted (BRICKID, OBJID) lookup table for fast photo-z matching.
+    '''
+    brick = np.asarray(sweep_cat['BRICKID'], dtype=np.int64)
+    obj = np.asarray(sweep_cat['OBJID'], dtype=np.int64)
+    key = (brick << 32) | (obj & 0xffffffff)
+    order = np.argsort(key)
+    return key[order], order
 
-    z_idx = np.where((sweep_cat['BRICKID'] == brickid) & (sweep_cat['OBJID'] == objid))[0]
-    if len(z_idx) == 0:
-        return 99, 1, 99, 99
-    z_mean = np.array(sweep_cat['Z_PHOT_MEAN'])[z_idx]
-    z_std  = np.array(sweep_cat['Z_PHOT_STD' ])[z_idx]
 
-    return z_mean, z_std
+def get_photoz(sweep_cat, brickid, objid, index=None):
+    '''
+    Look up the photo-z of a source in the sweep catalog.
+
+    Pass a precomputed ``index`` (see ``_sweep_index``) to avoid rebuilding
+    the lookup table for every source.
+    '''
+    if index is None:
+        index = _sweep_index(sweep_cat)
+    keys, order = index
+
+    target = (int(brickid) << 32) | (int(objid) & 0xffffffff)
+    pos = np.searchsorted(keys, target)
+    if pos >= len(keys) or keys[pos] != target:
+        return 99, 1
+
+    i = order[pos]
+    return sweep_cat['Z_PHOT_MEAN'][i], sweep_cat['Z_PHOT_STD'][i]
 
 
 def get_photometry(tractor_cat, src_index):
 
     i = src_index
 
-    # flux can be non-positive, yielding NaN magnitudes; suppress the warning
+    # flux can be non-positive; suppress the warning
     with np.errstate(divide="ignore", invalid="ignore"):
         mr = 22.5 - 2.5 * np.log10(tractor_cat["flux_r"][i] / tractor_cat["mw_transmission_r"][i])
         mz = 22.5 - 2.5 * np.log10(tractor_cat["flux_z"][i] / tractor_cat["mw_transmission_z"][i])
@@ -221,7 +241,6 @@ def mask_separate(working_dir, bkg_ref_band, galaxy=None,
     ref_img = fits.open(path / "cropped" / f"crop_{galaxy}_{bkg_ref_band}.fits")
     mask = ndimage.gaussian_filter(ref_mask[0].data, 1)
     mask = mask > 0.5
-    # mask_label, _ = ndimage.label(mask)
 
     segm = detect_sources(mask.astype(int), 0.5, npixels=1)
     if deblend:
@@ -239,7 +258,7 @@ def mask_separate(working_dir, bkg_ref_band, galaxy=None,
 
 
 def center_stars(workdir, hdu, seg_center, coord,
-                 year_to_gaia=-12, pm_sigma=3.5, mag_limit=19):
+                 year_to_gaia=-12, pm_sigma=5, mag_limit=19):
     '''
     get gaia stars within the inner mask.
     '''
@@ -247,7 +266,6 @@ def center_stars(workdir, hdu, seg_center, coord,
     wcs = WCS(hdu.header)
     img_size = np.array(hdu.data.shape) * np.abs(wcs.pixel_scale_matrix.diagonal())
 
-    # file_path = "/home/pku/Astro/FEASTS_SED/data/ancillary/"
     gaia_cat  = 'Gaia3_stars.vot'
     
     if gaia_cat not in os.listdir(path / "aux"):
@@ -269,23 +287,24 @@ def center_stars(workdir, hdu, seg_center, coord,
     stars['ra']  += year_to_gaia * stars['pmra']  / 1000 / 3600
     stars['dec'] += year_to_gaia * stars['pmdec'] / 1000 / 3600
     
+    wcs = WCS(hdu.header)
     star_coord = SkyCoord(stars['ra'], stars['dec'], unit='deg')
-    star_pixel = WCS(hdu.header).world_to_pixel(star_coord)
+    star_pixel = wcs.world_to_pixel(star_coord)
     stars['xcentroid'] = star_pixel[0]
     stars['ycentroid'] = star_pixel[1]
     
     # skip sources outside the mask and at image center
     cstars_index = []
+    ny, nx = hdu.data.shape
     for i in range(len(stars)):
         x = round(stars['xcentroid'][i])
         y = round(stars['ycentroid'][i])
-        if x < 0 or y < 0 or x >= hdu.data.shape[1] or y >= hdu.data.shape[0]:
+        if x < 0 or y < 0 or x >= nx or y >= ny:
             continue
         if seg_center[y][x] == 0:
             continue
-        # _r = 50 if galaxy in ['NGC2903', 'NGC4214', 'NGC4449', 'NGC5194'] else 10
         _r = 10
-        if np.sqrt( (x-WCS(hdu.header).pixel_shape[1]/2)**2 + (y-WCS(hdu.header).pixel_shape[0]/2)**2) < _r:
+        if np.sqrt( (x-wcs.pixel_shape[1]/2)**2 + (y-wcs.pixel_shape[0]/2)**2) < _r:
             continue
         if stars['phot_rp_mean_mag'][i] > mag_limit and stars['phot_bp_mean_mag'][i] > mag_limit: # skip faint stars ?
             continue
@@ -300,30 +319,34 @@ def get_high_z_source(hdu, tractor_cat, sweep_cat, seg_center,
     get high-z sources from the tractor catalog.
     '''
     tractor_cat_highz = tractor_cat.copy()
+    sweep_index = _sweep_index(sweep_cat)
 
-    src_pixel = WCS(hdu.header).world_to_pixel(SkyCoord(tractor_cat['ra'], 
-                                                        tractor_cat['dec'],
-                                                        unit='deg'))
+    wcs = WCS(hdu.header)
+    src_pixel = wcs.world_to_pixel(SkyCoord(tractor_cat['ra'], 
+                                            tractor_cat['dec'],
+                                            unit='deg'))
     tractor_cat_highz['xcentroid'] = src_pixel[0]
     tractor_cat_highz['ycentroid'] = src_pixel[1]
 
     highz_idx = []
+    ny, nx = hdu.data.shape
     for i in range(len(tractor_cat)):
         # skip sources outside the mask
         x = round(tractor_cat_highz['xcentroid'][i])
         y = round(tractor_cat_highz['ycentroid'][i])
-        if x < 0 or y < 0 or x >= hdu.data.shape[1] or y >= hdu.data.shape[0]:
+        if x < 0 or y < 0 or x >= nx or y >= ny:
             continue
         if seg_center[y][x] == 0:
             continue
         # skip sources at image center
-        if np.sqrt( (x-WCS(hdu.header).pixel_shape[1]/2)**2 + (y-WCS(hdu.header).pixel_shape[0]/2)**2) < 50:
+        if np.sqrt( (x-wcs.pixel_shape[1]/2)**2 + (y-wcs.pixel_shape[0]/2)**2) < 50:
             continue
         
         # get photo-z from sweep catalog
         z_mean, z_std = get_photoz(sweep_cat, 
                                    tractor_cat["brickid"][i], 
-                                   tractor_cat["objid"][i])
+                                   tractor_cat["objid"][i],
+                                   index=sweep_index)
 
         # get desi ls-dr9 photometry
         r, z = get_photometry(tractor_cat, i)
@@ -337,7 +360,7 @@ def get_high_z_source(hdu, tractor_cat, sweep_cat, seg_center,
 
 def get_catalogs(workdir, galaxy, bkg_ref_band, coord,
                  gal_z=0, year_to_gaia=-12, pm_sigma=5, nprocess=1,
-                 mag_limit=19):
+                 mag_limit=20):
     '''
     get the catalogs center stars and high-z sources.
     '''
@@ -353,8 +376,9 @@ def get_catalogs(workdir, galaxy, bkg_ref_band, coord,
     ref_hdu = fits.open(path / "cropped" / f"crop_{galaxy}_{bkg_ref_band}.fits")[0]
     ref_wcs = WCS(ref_hdu.header)
     seg_center = fits.open(path / "aux" / "ref_mask_inner.fits")[0]
-    seg_cen_dilate = ndimage.binary_dilation(seg_center.data, 
-                                             structure=np.ones((3, 3))).astype(int)
+    # seg_cen_dilate = ndimage.binary_dilation(seg_center.data, 
+    #                                          structure=np.ones((9, 9))).astype(int)
+    seg_cen_dilate = np.full(seg_center.data.shape, 1, dtype=int)
     seg_center = utils.reproject_mask(seg_cen_dilate, WCS(seg_center.header),
                                       ref_wcs, ref_hdu.data.shape, cval=np.nan)
     
@@ -412,8 +436,11 @@ def mask_one_band_inner(workdir, galaxy, band, cstars, csources,
             ra, dec = csources['ra'][j], csources['dec'][j]
         pixel = cur_wcs.world_to_pixel(SkyCoord(ra, dec, unit='deg'))
         cy, cx = int(pixel[1]), int(pixel[0])
+        
         # skip sources outside the image
-        if cx < 0 or cy < 0 or cx >= mask.shape[1] or cy >= mask.shape[0]:
+        if cx < crop_size_large or cy < crop_size_large\
+              or cx >= mask.shape[1] - crop_size_large\
+              or cy >= mask.shape[0] - crop_size_large:
             continue
         # crop region near the source, use larger crop size for very bright stars
         size = crop_size
@@ -421,8 +448,6 @@ def mask_one_band_inner(workdir, galaxy, band, cstars, csources,
             size = crop_size_large
             if cstars['phot_rp_mean_mag'][i] < 10:
                 size *= 2
-        # elif i >= len(cstars) and 22.5 - 2.5*np.log10(csources['flux_r'][j]) < 19:
-        #     size = crop_size_large
         
         crop_radius = int(size * fwhm)
         y0, x0 = cy - crop_radius, cx - crop_radius
@@ -430,7 +455,9 @@ def mask_one_band_inner(workdir, galaxy, band, cstars, csources,
                                x0: x0 + 2 * crop_radius + 1]
         # actual source position inside the (possibly truncated) crop
         cyc, cxc = cy - y0, cx - x0
-        if "wise" not in band:         # wise images are already smoothed enough ......
+
+        if "wise" not in band and "spire" not in band:  
+            # the skipped bands are smoothed enough ...
             crop = ndimage.gaussian_filter(crop, fwhm / 2.355)
 
         # estimate the local background from an annulus around the source,
@@ -439,38 +466,38 @@ def mask_one_band_inner(workdir, galaxy, band, cstars, csources,
         dist = np.hypot(yy - cyc, xx - cxc)
         r_in = max(crop_radius // 2, 1)
         annulus = (dist >= r_in) & np.isfinite(crop)
-        if annulus.sum() < 10:         # too few pixels: fall back to the whole crop
+        if annulus.sum() < 10:   # too few pixels: use the whole crop
             annulus = np.isfinite(crop)
         if annulus.sum() == 0:
             continue
-        _, back_median, back_std = sigma_clipped_stats(crop[annulus],
-                                                       sigma=3.0, maxiters=5)
+        _, bkg_median, bkg_std = sigma_clipped_stats(crop[annulus])
         
-        if cur_hdu[0].data[cy, cx] < back_median + back_std * thresh:
+        if cur_hdu[0].data[cy, cx] < bkg_median + bkg_std * thresh:
             continue
         else: 
             # mask central segment
             _thresh = deepcopy(thresh)
             _dilate = deepcopy(dilate)
 
-            if back_std <= 0 or not np.isfinite(back_std):
+            if bkg_std <= 0 or not np.isfinite(bkg_std):
                 continue
 
             for _ in range(10):
-                crop_mask = crop > back_median + back_std * _thresh
+                crop_mask = crop > bkg_median + bkg_std * _thresh
                 crop_mask_label, _ = ndimage.label(crop_mask)
                 crop_mask[crop_mask_label != crop_mask_label[cyc, cxc]] = 0
                 # if crop mask touches the edge of the crop region ...
-                if np.any(crop_mask[0, :] | crop_mask[-1, :] | crop_mask[:, 0] | crop_mask[:, -1]):
-                    _thresh += 0.5
-                    _dilate += 0.5
+                if np.any(crop_mask[0, :] | crop_mask[-1, :]) or\
+                      np.any(crop_mask[:, 0] | crop_mask[:, -1]):
+                    _thresh += 1
+                    _dilate = min(_dilate + 0.5, 3)
                 else:
                     break
 
             if dilate > 0:
                 radius = int(fwhm * _dilate)
                 if radius > 0:
-                    # isotropic (circular) dilation instead of an iterated cross
+                    # isotropic (circular) dilation
                     dy, dx = np.ogrid[-radius: radius + 1, -radius: radius + 1]
                     disk = (dx**2 + dy**2) <= radius**2
                     crop_mask = ndimage.binary_dilation(crop_mask, structure=disk)
@@ -625,8 +652,8 @@ def do_mask(workdir, galaxy, band, bkg_ref_band,
         if verbose:
             print(f"generating new mask for {band} ...")
 
-        star_cat  = [] if cwave > 3e5 else cstars    # no star mask beyond 30 um
-        highz_cat = [] if cwave < 3e3 else csources  # no high-z source mask below 300 A
+        star_cat  = [] if cwave > 2e5 else cstars    # no star mask beyond 20 um
+        highz_cat = [] if cwave < 3e3 else csources  # no high-z source mask below 3000 A
 
         # inner and outer masks
         mask_inner = mask_one_band_inner(path, galaxy, band, 

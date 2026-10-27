@@ -15,7 +15,18 @@ __all__ = [
     "resolve_coord",
     "save_json",
     "select_dict",
+    "set_assume_yes",
 ]
+
+
+# when True, check_output() proceeds without asking (set by ``-y``)
+_ASSUME_YES = False
+
+
+def set_assume_yes(flag=True):
+    '''answer "yes" to every existing-output check without prompting.'''
+    global _ASSUME_YES
+    _ASSUME_YES = bool(flag)
 
 
 def read_par(par_file):
@@ -106,7 +117,10 @@ def check_output(out_path):
     check whether the output file exists.
     '''
     import os
-    
+
+    if _ASSUME_YES:
+        return 0
+
     if os.path.exists(out_path):
         user_input = input("Output files exist. Enter 'Y' to overwrite: ")
         if user_input.upper() != 'Y':

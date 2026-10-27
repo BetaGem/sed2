@@ -58,7 +58,9 @@ def _subtract_background_band(args):
         box_size=parc["bkg_box_size"],
         mask_thresh=parc["bkg_mask_thresh"],
         npixels=parc["bkg_npixels"],
-        gaussian_noise=parc["bkg_gaussian_noise"],
+        # GALEX images use plain source detection; other bands model the
+        # background noise as a Gaussian
+        gaussian_noise=("galex" not in filt),
     )
 
 
@@ -73,10 +75,10 @@ def _do_mask_band(args):
                    crop_size=mask_box, crop_size_large=mask_box_large,
                    thresh=mask_in_thresh,
                    dilate=mask_in_dilate,
-                    thresh_out=mask_out_thresh, clean=mask_clean)
+                   thresh_out=mask_out_thresh, clean=mask_clean)
 
 
-def run(par_file=None):
+def run(par_file=None, assume_yes=False):
     """
     Run the SED2 pipeline using a parameter file.
 
@@ -84,7 +86,11 @@ def run(par_file=None):
     ----------
     par_file : str or Path, optional
         Path to the parameter file. If None, ``demo/demo.par`` is used.
+    assume_yes : bool, optional
+        If True, existing outputs are overwritten without asking.
     """
+    utils.set_assume_yes(assume_yes)
+
     if par_file is None:
         par_file = PATH / "demo" / "demo.par"
 
@@ -277,7 +283,11 @@ def run(par_file=None):
                                        n_processes=nprocess)
             fitting.new_flux_table(workdir, 
                                    out_file=path_ft)
-            fitting.fit_all(workdir, 
+            
+            print("press Enter to continue the 2nd-pass fitting...")
+            input()
+
+            fitting.fit_all(workdir,
                             flux_table=path_ft,
                             redshift=params["redshift"],
                             nprocess=nprocess,

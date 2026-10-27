@@ -20,25 +20,22 @@ warnings.filterwarnings(
 )
 
 
-def Gaussian(x, A, mu, sigma):
-    return A * np.exp(- (x - mu) ** 2 / 2 / sigma**2)
+def fit_gaussian_for_image(data, model_percent=95):
 
-
-def fit_gaussian_for_image(data, model_percent=95, verbose=True):
-    data_flat = data.reshape(-1)
-    hist, bin = np.histogram(data_flat[(data_flat < np.nanpercentile(data_flat, model_percent)) &\
-                                       (data_flat > np.nanpercentile(data_flat, 10))], bins=100)
+    def Gaussian(x, A, mu, sigma):
+        return A * np.exp(- (x - mu) ** 2 / 2 / sigma**2)
+    
+    dat = data.reshape(-1)
+    hist, bin = np.histogram(dat[(dat < np.nanpercentile(dat, model_percent)) &\
+                                 (dat > np.nanpercentile(dat, 10))], 
+                             bins=100)
     bins = (bin[:-1] + bin[1:]) / 2
     
     popt, pcov = curve_fit(Gaussian, bins, hist, 
                            p0=[np.nanmax(hist), bins[np.argmax(hist)], 
-                               sigma_clipped_stats(data_flat)[2]], 
+                               sigma_clipped_stats(dat)[2]], 
                            bounds=([np.nanmax(hist)/2, -np.inf, 0], 
                                    [np.nanmax(hist)*2, np.inf, np.inf]))
-    # if verbose:
-    #     plt.scatter(bins, hist, c='k')
-    #     plt.plot(_x:=np.linspace(bins[0], bins[-1], num=100), Gaussian(_x, *popt), 'r--')
-    #     plt.show()
 
     return popt, pcov
 
@@ -99,21 +96,38 @@ def mask_region_bgmodel(data, thresh=3, model_percent=86, npixels=10,
     # fit a Gaussian to the histogram of pixel values for source detection
     data = ndimage.gaussian_filter(data, 3)
     popt, _pcov = fit_gaussian_for_image(data, verbose=verbose,
-                                        model_percent=model_percent)
+                                         model_percent=model_percent)
     
-    thresh = popt[1] + popt[2] * thresh  # should be replaced with SEb if works bad
+    thresh = popt[1] + popt[2] * thresh
     segm_map = detect_sources(data, threshold=thresh, npixels=npixels)
     if segm_map is None:
         return np.full(data.shape, False), data.shape[0]
 
-    dim_y = segm_map.data.shape[0]
-    dim_x = segm_map.data.shape[1]
-    mask_region = np.zeros((dim_y, dim_x))
+    return segm_map.data > 0
 
-    rows, cols = np.where(segm_map.data > 0)
-    mask_region[rows, cols] = 1
 
-    return mask_region
+
+def mask_region_background2d(data, thresh=3, npixels=10):
+
+    # use Background2D to estimate the background and its RMS
+    # then mask sources above a threshold
+    from photutils.background import Background2D
+
+    mask = np.isfinite(data)
+    dim_y = data.shape[0]
+    dim_x = data.shape[1]
+    s = min(dim_x, dim_y) // 3
+    bkg = Background2D(data, 
+                       coverage_mask=~mask,
+                       box_size=(s, s),
+                       exclude_percentile=100)
+    thresh = bkg.background + thresh * bkg.background_rms
+
+    segm_map = detect_sources(data, threshold=thresh, npixels=npixels)
+    if segm_map is None:
+        return np.full(data.shape, False), data.shape[0]
+
+    return segm_map.data > 0
 
 
 
@@ -169,14 +183,13 @@ def subtract_background(workdir, fits_image, hdu_idx=0, sigma=3.0,
 
     # source mask
     if gaussian_noise:
-        mask_region0 = mask_region_bgmodel(data_image,
-                                           thresh=mask_thresh,
-                                           npixels=npixels,
-                                           verbose=verbose)
+        mask_region0 = mask_region_background2d(data_image,
+                                                thresh=mask_thresh,
+                                                npixels=npixels)
     else:
-        mean, _med, std = sigma_clipped_stats(data_image)
+        mean, _m, std = sigma_clipped_stats(data_image)
         segm = detect_sources(data_image, threshold=mean + mask_thresh * std, npixels=npixels)
-        mask_region0 = (segm.data > 0).astype(int)
+        mask_region0 = segm.data > 0
     
     if box_size is None:
         box_size = min(dim_x, dim_y) // 3
@@ -195,7 +208,7 @@ def subtract_background(workdir, fits_image, hdu_idx=0, sigma=3.0,
             sys.exit()
         else:
             mask_region1 = np.full((dim_y,dim_x), 0)
-            rows, cols = np.where((mask_region0==1) | (mask_region==1))
+            rows, cols = np.where(mask_region0 | (mask_region==1))
             mask_region1[rows, cols] = 1
 
     # dilate mask by 3 pixels

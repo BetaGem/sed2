@@ -35,7 +35,7 @@ from matplotlib.patches import Circle
 __all__ = ["CircleMaskCreator", "interactive_mask"]
 
 
-def _downsample_for_display(data, max_size=3200):
+def _downsample_for_display(data, max_size=6400):
     '''
     Stride large images down for fast interactive rendering.
 
